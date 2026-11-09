@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qisaget</title>
+<style>
+  :root{
+    --bg:#a5d1f8;      /* əsas açıq göy rəng */
+    --side:#6ea6d8;    /* yan zolaqlar */
+    --ink:#000;
+    --card:#fff;
+    --muted:#6b6b6b;
+    --toggle:#3b76ac;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Inter","Segoe UI",Arial,sans-serif;background:var(--side);color:var(--ink);min-height:100vh}
+  .page{max-width:580px;margin:0 auto;background:var(--bg);min-height:100vh;position:relative;padding-bottom:40px;box-shadow:0 0 30px rgba(0,0,0,.2)}
+
+  /* üst düymələr */
+  .topbtn{position:absolute;top:16px;width:42px;height:42px;border-radius:14px;border:0;background:rgba(255,255,255,.55);display:grid;place-items:center;font-size:20px;cursor:pointer}
+  .topbtn.left{left:16px;background:rgba(255,255,255,.6)}
+  .topbtn.right{right:16px}
+
+  /* hero */
+  .hero{height:420px;display:grid;place-items:center;position:relative;overflow:hidden}
+  .logo-big{width:270px;height:270px;color:#000;transform:translateY(-10px)}
+  .eye{position:absolute;width:38px;height:56px;background:#fbeee6;border:2px solid #3a2a12;border-radius:50%}
+  .eye::after{content:"";position:absolute;width:20px;height:28px;background:#4a2b08;border-radius:50%;left:9px;top:14px}
+  .eye.e1{left:19%;top:150px}
+  .eye.e2{right:20%;top:310px;width:52px;height:74px}
+  .eye.e2::after{width:28px;height:38px;left:12px;top:18px}
+
+  .profile{text-align:center;padding:0 16px}
+  .profile h1{font-size:22px;font-weight:700}
+  .profile p{font-size:15px;margin-top:6px}
+  .socials{display:flex;justify-content:center;gap:22px;margin:18px 0 14px;font-size:24px}
+  .socials a{color:#000;text-decoration:none}
+  .verified{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.35);padding:4px 10px;border-radius:8px;font-size:12px}
+  .verified i{width:16px;height:16px;border-radius:50%;background:#e8a54b;display:inline-block}
+
+  /* Ev / Mağaza keçidi */
+  .switch{display:flex;width:192px;height:52px;margin:22px auto 26px;background:var(--toggle);border-radius:30px;padding:4px;border:2px solid #2c5a86}
+  .switch button{flex:1;border:0;border-radius:26px;background:transparent;color:#fff;font-weight:700;font-size:15px;cursor:pointer}
+  .switch button.active{background:#fff;color:#000}
+
+  /* bölmələr */
+  section{margin-top:26px}
+  section h2{text-align:center;font-size:15px;font-weight:700;margin-bottom:14px}
+
+  /* üfüqi sürüşən kartlar */
+  .row{display:flex;gap:16px;overflow-x:auto;padding:0 28px 10px;scroll-snap-type:x mandatory;scrollbar-width:none}
+  .row::-webkit-scrollbar{display:none}
+  .card{flex:0 0 220px;background:var(--card);border:2px solid #000;border-radius:24px;box-shadow:4px 5px 0 #000;overflow:hidden;scroll-snap-align:start}
+  .card.wide{flex-basis:370px;padding:14px;padding-bottom:0}
+  .card .thumb{height:220px;display:block}
+  .card.wide .thumb{height:210px;border-radius:14px}
+  .card .cap{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:14px 12px;font-size:15px;font-weight:500;line-height:1.25}
+  .dots{color:#777;font-size:16px;cursor:pointer}
+
+  /* profil kartı */
+  .pcard{height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;gap:6px;text-align:center}
+  .avatar{width:100px;height:100px;border-radius:50%;background:#ddd;border:0}
+  .pcard b{font-size:19px}
+  .pcard small{font-size:13px;opacity:.85}
+
+  /* uzun linklər */
+  .links{display:flex;flex-direction:column;gap:14px;padding:0 28px}
+  .link{background:#fff;border:2px solid #000;border-radius:999px;box-shadow:4px 5px 0 #000;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;text-decoration:none;color:#000;min-height:62px;position:relative}
+  .link .t{flex:1;text-align:center}
+  .link .t b{display:block;font-size:16px;font-weight:500}
+  .link .t span{font-size:12px;color:var(--muted)}
+  .link .ico{width:48px;height:48px;border-radius:50%;background:var(--bg);display:grid;place-items:center;font-size:22px;margin:-6px 0 -6px -10px;flex:0 0 auto}
+  .link .spacer{width:48px;flex:0 0 auto}
+
+  /* Instagram bloku */
+  .igcard{background:#fff;border:2px solid #000;border-radius:26px;box-shadow:4px 5px 0 #000;padding:14px 14px 14px;margin:0 28px}
+  .igcard h3{text-align:center;font-size:16px;font-weight:500}
+  .igcard small{display:block;text-align:center;color:var(--muted);font-size:12px;margin:4px 0 12px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);border-radius:20px;overflow:hidden;gap:1px;background:#fff}
+  .grid div{aspect-ratio:3/4}
+
+  /* altlıq */
+  .cta{display:block;width:max-content;margin:70px auto 26px;background:#fff;border:0;border-radius:999px;padding:16px 26px;font-size:16px;font-weight:600;box-shadow:0 3px 10px rgba(0,0,0,.25);cursor:pointer}
+  .footer{text-align:center;font-size:12px;padding:0 16px}
+
+  /* şəkil yerləri (öz şəkillərinizlə əvəz edin) */
+  .c-red{background:#c41200}.c-green{background:#a8dc5a}.c-wine{background:#6e0007}.c-brown{background:#2e2523}
+  .c-mix1{background:linear-gradient(135deg,#a50c24,#f0b0c0)}
+  .c-mix2{background:linear-gradient(135deg,#7a4a2a,#d9b96a)}
+  .c-mix3{background:linear-gradient(135deg,#0f5a2a,#7ab2e0)}
+  .c-teal{background:#00a9c4}.c-pink{background:#cd00d8}.c-dark{background:#1b2232}
+  .c-orange{background:#ff8a10}.c-navy{background:#0a1a9a}.c-sky{background:#1a73e8}
+  .c-p1{background:linear-gradient(160deg,#3566d6,#7fb0ff)}.c-p2{background:#ff8a10}.c-p3{background:#d6ef2a}
+  .c-p4{background:#cba8f0}.c-p5{background:#10203a}.c-p6{background:#f2ecdf}
+  .c-photo1{background:linear-gradient(160deg,#f1e6dc,#b99a7a)}.c-photo2{background:linear-gradient(160deg,#dfe7ec,#8a6e5a)}
+  .c-person1{background:#1f4fd0}.c-person2{background:#d8d2cc}.c-person3{background:#0f3d2a}
+
+  /* ikinci səhifə: açılış (landing) */
+  .landing{display:none;background:var(--bg);min-height:100vh}
+  .banner{background:#7a0022;color:#fff;text-align:center;font-size:12px;padding:12px 40px;position:relative}
+  .banner a{color:#fff;text-decoration:underline}
+  .banner .x{position:absolute;right:16px;top:8px;font-size:20px;cursor:pointer}
+  .nav{margin:16px;background:#fff;border-radius:999px;padding:18px 24px;display:flex;justify-content:space-between;align-items:center}
+  .nav b{font-size:24px;letter-spacing:-1px}
+  .nav span{font-size:24px;cursor:pointer}
+  .landing .inner{padding:30px 28px}
+  .kicker{font-size:13px;font-weight:800;margin-bottom:22px}
+  .landing h1{font-size:56px;line-height:.95;color:#12365c;font-weight:900;letter-spacing:-2px}
+  .landing p{margin:26px 0 30px;font-size:16px;line-height:1.5;color:#10243d}
+  .landing input{width:100%;padding:18px;font-size:16px;border:0;border-radius:12px;margin-bottom:12px}
+  .landing .go{width:100%;padding:20px;border:0;border-radius:999px;background:#12365c;color:#fff;font-weight:700;font-size:16px;cursor:pointer}
+  .landing .team{margin-top:40px;font-size:15px}
+  .tabs-note{display:none}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="qlogo" viewBox="0 0 100 100">
+    <g stroke="currentColor" stroke-width="9" fill="none" stroke-linecap="butt">
+      <path d="M50 3V36M50 64V97M3 50H36M64 50H97"/>
+      <path d="M34 34L14 14M66 34L86 14M34 66L14 86M66 66L86 86"/>
+      <rect x="37" y="37" width="26" height="26" stroke-width="8"/>
+    </g>
+  </symbol>
+</svg>
+
+<!-- ============== ƏSAS PROFİL SƏHİFƏSİ ============== -->
+<div class="page" id="profile">
+  <button class="topbtn left" aria-label="Menyu" onclick="showLanding()"><svg width="26" height="26" viewBox="0 0 100 100"><use href="#qlogo"/></svg></button>
+  <button class="topbtn right" aria-label="Paylaş">⤴</button>
+
+  <div class="hero">
+    <div class="eye e1"></div>
+    <svg class="logo-big" viewBox="0 0 100 100" role="img" aria-label="Qisaget loqosu"><use href="#qlogo"/></svg>
+    <div class="eye e2"></div>
+  </div>
+
+  <div class="profile">
+    <h1>Qisaget</h1>
+    <p>Hər şeyin varlığı. Sadə bir linkdə.</p>
+    <div class="socials">
+      <a href="#" aria-label="Instagram">◎</a>
+      <a href="#" aria-label="TikTok">♪</a>
+      <a href="#" aria-label="LinkedIn"><b>in</b></a>
+      <a href="#" aria-label="YouTube">▶</a>
+      <a href="#" aria-label="Discord">◉</a>
+      <a href="#" aria-label="E-poçt">✉</a>
+    </div>
+    <span class="verified"><i></i> Təsdiqlənib</span>
+  </div>
+
+  <div class="switch">
+    <button class="active" id="btnHome">Ev</button>
+    <button id="btnShop">Mağaza</button>
+  </div>
+
+  <!-- Xəbərlər -->
+  <div class="row">
+    <div class="card wide">
+      <div class="thumb c-red"></div>
+      <div class="cap"><span style="flex:1;text-align:center">Yaradıcılar üçün Yeni YouTube Alətləri</span><span class="dots">⋮</span></div>
+    </div>
+    <div class="card wide">
+      <div class="thumb c-green"></div>
+      <div class="cap"><span style="flex:1;text-align:center">İzləyiciləri B…</span><span class="dots">⋮</span></div>
+    </div>
+  </div>
+
+  <section>
+    <h2>Seçilmiş Linkerlər</h2>
+    <div class="row">
+      <div class="card">
+        <div class="pcard c-wine"><div class="avatar"></div><b>@bella.kay</b><small>✳/bella.kay</small></div>
+        <div class="cap"><span>bella.kay Rəsmi: TikTok, Instagram | Qisaget</span><span class="dots">⋮</span></div>
+      </div>
+      <div class="card">
+        <div class="pcard c-brown"><div class="avatar"></div><b>Hadas Brown</b><small>✳/hadasdoesrealestate</small></div>
+        <div class="cap"><span>Hadas Brown Realtor - İnstaqramda Daşınma…</span><span class="dots">⋮</span></div>
+      </div>
+      <div class="card">
+        <div class="pcard c-brown"><div class="avatar"></div><b>Miles Bo…</b></div>
+        <div class="cap"><span>Miles Bo… Rəsmi: T…</span><span class="dots">⋮</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Qisaget-in Miksteypi 🎵</h2>
+    <div class="row">
+      <div class="card"><div class="thumb c-mix1"></div><div class="cap"><span>Qisaget Mixtape (feat. Petie)</span><span class="dots">⋮</span></div></div>
+      <div class="card"><div class="thumb c-mix2"></div><div class="cap"><span>Qisaget Mixtape (feat. Wyatt Ellis)</span><span class="dots">⋮</span></div></div>
+      <div class="card"><div class="thumb c-mix3"></div><div class="cap"><span>Qisaget Mixtape (feat. Owen M…</span><span class="dots">⋮</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>İcmamıza qoşulun</h2>
+    <div class="links">
+      <a class="link" href="#">
+        <span class="ico" style="background:transparent">◉</span>
+        <span class="t"><b>🌳 Qisaget İcması</b><span>Discord Server • Qoşulmaq pulsuzdur</span></span>
+        <span class="dots">⋮</span>
+      </a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Bizimlə dizayn edin</h2>
+    <div class="links">
+      <a class="link" href="#"><span class="spacer"></span><span class="t"><b>Yeni dizayn redaktorumuzu sınayın</b></span><span class="dots">⋮</span></a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Bizimlə qazanın</h2>
+    <div class="row">
+      <div class="card"><div class="thumb c-teal"></div><div class="cap"><span>Satışa başlayın</span><span class="dots">⋮</span></div></div>
+      <div class="card"><div class="thumb c-pink"></div><div class="cap"><span>Komissiya qazanın</span><span class="dots">⋮</span></div></div>
+      <div class="card"><div class="thumb c-dark"></div><div class="cap"><span>Rəqəmsal Məhsullar</span><span class="dots">⋮</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Bizimlə böyüyün</h2>
+    <div class="row">
+      <div class="card"><div class="thumb c-orange"></div><div class="cap"><span>E-poçtları toplayın</span><span class="dots">⋮</span></div></div>
+      <div class="card"><div class="thumb c-navy"></div><div class="cap"><span>Məzmununuzu planlaşdırın</span><span class="dots">⋮</span></div></div>
+      <div class="card"><div class="thumb c-sky"></div><div class="cap"><span>Nişanınızı avtomatlaşdırın</span><span class="dots">⋮</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>İzləmək üçün linkerlər</h2>
+    <div class="row">
+      <div class="card"><div class="thumb c-person1"></div><div class="cap"><span>Bio linkiniz internetin ən işlək kəsişməsidir</span><span class="dots">⋮</span></div></div>
+      <div class="card"><div class="thumb c-photo1"></div><div class="cap"><span>Bio linkiniz internetin ən işlək kəsişməsidir</span><span class="dots">⋮</span></div></div>
+      <div class="card"><div class="thumb c-person3"></div><div class="cap"><span>…</span><span class="dots">⋮</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="row">
+      <div class="card"><div class="thumb c-photo1"></div><div class="cap"><span>Bio linkiniz internetin ən işlək kəsişməsidir</span><span class="dots">⋮</span></div></div>
+      <div class="card"><div class="thumb c-photo2"></div><div class="cap"><span>Qisaget-də analitika</span><span class="dots">⋮</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="links">
+      <a class="link" href="#"><span class="ico" style="background:transparent">📱</span><span class="t"><b>Tətbiqimizi yükləyin</b><span>Tətbiq Mağazası</span></span><span class="dots">⋮</span></a>
+      <a class="link" href="#"><span class="ico"><svg width="30" height="30" viewBox="0 0 100 100"><use href="#qlogo"/></svg></span><span class="t"><b>Bizim TikTok</b><span>♪ Qisaget · 72.8K İzləyici</span></span><span class="dots">⋮</span></a>
+      <a class="link" href="#"><span class="spacer"></span><span class="t"><b>Yardım Mərkəzi</b></span><span class="dots">⋮</span></a>
+    </div>
+  </section>
+
+  <section>
+    <div class="igcard">
+      <h3>Qisaget Instagram-da</h3>
+      <small>◎ İnstagram · 6 yazı</small>
+      <div class="grid">
+        <div class="c-p1"></div><div class="c-p2"></div><div class="c-p3"></div>
+        <div class="c-p4"></div><div class="c-p5"></div><div class="c-p6"></div>
+      </div>
+    </div>
+  </section>
+
+  <button class="cta" onclick="showLanding()">Öz Qisaget-ni yarat</button>
+
+  <div class="footer">Kuki Seçimləri • Hesabat • Məxfilik • Araşdırın • Bu hesab haqqında • Qisaget-dən daha çox</div>
+</div>
+
+<!-- ============== AÇILIŞ (LANDING) SƏHİFƏSİ ============== -->
+<div class="landing" id="landing">
+  <div class="banner">YouTube kanalınızı Qisaget-də gücləndirin. <a href="#">Bu gün qoşulun.</a><span class="x" onclick="this.parentNode.style.display='none'">✕</span></div>
+  <div class="nav"><b style="display:flex;align-items:center;gap:6px">Qisaget<svg width="28" height="28" viewBox="0 0 100 100"><use href="#qlogo"/></svg></b><span onclick="showProfile()">☰</span></div>
+  <div class="inner">
+    <div class="kicker">BİR LİNK. BÜTÜN DÜNYA.</div>
+    <h1>Bioda sizin üçün hazırlanmış bir keçid.</h1>
+    <p>Biodakı link üçün Qisaget istifadə edən milyonlarla insana qoşulun. Instagram, TikTok, YouTube və digər sosial media profillərinizdən yaratdığınız, seçdiyiniz və satdığınız hər şeyi paylaşmağınıza kömək edəcək bir link.</p>
+    <input type="text" placeholder="qisaget.az/">
+    <button class="go">Pulsuz başlayın</button>
+    <div class="team">Yaradıcı komanda</div>
+  </div>
+</div>
+
+<script>
+  function showLanding(){document.getElementById('profile').style.display='none';document.getElementById('landing').style.display='block';window.scrollTo(0,0)}
+  function showProfile(){document.getElementById('landing').style.display='none';document.getElementById('profile').style.display='block';window.scrollTo(0,0)}
+  var h=document.getElementById('btnHome'),s=document.getElementById('btnShop');
+  h.onclick=function(){h.classList.add('active');s.classList.remove('active')};
+  s.onclick=function(){s.classList.add('active');h.classList.remove('active')};
+</script>
+</body>
+</html>

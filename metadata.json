@@ -1,0 +1,6 @@
+{
+  "name": "Qisaget - Hər şey bir linkdə",
+  "description": "Sadə və güclü bio linki, yaradıcı profili və rəqəmsal mağaza platforması.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
