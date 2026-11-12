@@ -51,21 +51,89 @@ export const THEME_OPTIONS: ThemeOption[] = [
   },
 ];
 
+export const CALIPER_WATCHES: ProductItem[] = [
+  {
+    id: 'caliper-watch-white',
+    title: 'GLACIER WHITE',
+    price: 27,
+    originalPrice: 45,
+    discountPercent: 40,
+    currency: 'AZN',
+    category: 'Saat',
+    description: '360° fırlanan çarx mexanizmi, ağ idman silikon kəməri, mat qara korpus və dəqiq kvars mexanizm.',
+    rating: 5.0,
+    reviewCount: 134,
+    badge: 'ENDİRİM 40%',
+    imageUrl: '/assets/aistudio/image_cdc8001f.png',
+    colorName: 'Ağ',
+    colorHex: '#ffffff',
+  },
+  {
+    id: 'caliper-watch-blue',
+    title: 'CHRONO-WHEEL',
+    price: 27,
+    originalPrice: 40,
+    discountPercent: 33,
+    currency: 'AZN',
+    category: 'Saat',
+    description: '360° fırlanan çarx mexanizmi, göy idman silikon kəməri, dərin mavi kaliper detalları və möhkəm korpus.',
+    rating: 5.0,
+    reviewCount: 172,
+    badge: 'ENDİRİM 33%',
+    imageUrl: '/assets/aistudio/image_bfc14340.png',
+    colorName: 'Göy',
+    colorHex: '#2563eb',
+  },
+  {
+    id: 'caliper-watch-red',
+    title: 'AEROVANTE-HÖRÜMÇƏK',
+    price: 25,
+    originalPrice: 42,
+    discountPercent: 40,
+    currency: 'AZN',
+    category: 'Saat',
+    description: '360° fırlanan hörümçək diski, alovlu qırmızı idman kəməri, qara korpus və dinamik kaliper vurğusu.',
+    rating: 5.0,
+    reviewCount: 182,
+    badge: 'ENDİRİM 40%',
+    imageUrl: '/assets/aistudio/image_dd17a3d1.png',
+    colorName: 'Qırmızı',
+    colorHex: '#ef4444',
+  },
+  {
+    id: 'caliper-watch-orange',
+    title: 'AEROVANTE-IGNIVANTE',
+    price: 25,
+    originalPrice: 39,
+    discountPercent: 36,
+    currency: 'AZN',
+    category: 'Saat',
+    description: '360° fırlanan idman diski, parlaq narıncı kəmər, cəsur avto-stil və eksklüziv kvars hərəkət mexanizmi.',
+    rating: 5.0,
+    reviewCount: 168,
+    badge: 'ENDİRİM 36%',
+    imageUrl: '/assets/aistudio/image_86ffd326.png',
+    colorName: 'Narıncı',
+    colorHex: '#f97316',
+  },
+];
+
 export const INITIAL_PROFILE: ProfileData = {
   username: 'na.mexman',
   displayName: 'Na.Mexman',
   bio: 'Bütün işlədiyim layihələr və Mağazalarım burada, sosial media linklərim hamısı bir linkdə yığılmışdır qisaget tərəfindən',
   isVerified: true,
   themeId: 'classic-blue',
+  wa: '994500000000',
   socials: {
-    instagram: 'https://instagram.com/na.mexman',
+    instagram: 'https://www.instagram.com/qisaget.az/?utm_source=ig_web_button_share_sheet',
     whatsapp: 'https://wa.me/994500000000',
     tiktok: 'https://tiktok.com/@na.mexman',
+    telegram: '',
+    youtube: 'https://youtube.com/@qisaget',
     facebook: 'https://facebook.com/na.mexman',
     linkedin: 'https://linkedin.com/in/na-mexman',
-    youtube: 'https://youtube.com/@qisaget',
     discord: 'https://discord.gg/qisaget',
-    email: 'na.mexman@gmail.com',
   },
   links: [
     {
@@ -101,71 +169,102 @@ export const INITIAL_PROFILE: ProfileData = {
       clicks: 3410,
     },
   ],
-  products: [
-    {
-      id: 'prod-1',
-      title: 'Qisaget Creator Presets (Lightroom)',
-      price: 19,
-      currency: 'AZN',
-      category: 'Rəqəmsal',
-      description: 'Mobil və masaüstü üçün 12 peşəkar Lightroom rəng korreksiyası preseti.',
-      gradient: 'linear-gradient(135deg, #a50c24, #f0b0c0)',
-      rating: 4.9,
-      badge: 'Ən Çox Satan',
-    },
-    {
-      id: 'prod-2',
-      title: 'Instagram Böyümə Bələdçisi 2026',
-      price: 29,
-      currency: 'AZN',
-      category: 'Rəqəmsal',
-      description: '0-dan 50k izləyiciyə çatmağın addım-addım strategiyası və alqoritm sirləri.',
-      gradient: 'linear-gradient(135deg, #0f5a2a, #7ab2e0)',
-      rating: 5.0,
-      badge: 'Yeni',
-    },
-    {
-      id: 'prod-3',
-      title: 'Qisaget "Sadə Bir Link" Köynəyi',
-      price: 45,
-      currency: 'AZN',
-      category: 'Merç',
-      description: '100% orqanik pambıq, xüsusi Qisaget loqo naxışı ilə premium oversize köynək.',
-      gradient: 'linear-gradient(135deg, #ff8a10, #3566d6)',
-      rating: 4.8,
-    },
-    {
-      id: 'prod-4',
-      title: 'Fərdi Bio Audit & Məsləhət (45 dəq)',
-      price: 65,
-      currency: 'AZN',
-      category: 'Xidmət',
-      description: 'Profilinizin linkləri, məzmun planı və konversiya dərəcəsinin fərdi analizi.',
-      gradient: 'linear-gradient(135deg, #7a4a2a, #d9b96a)',
-      rating: 4.9,
-    },
-  ],
-  heroImageUrl: '',
+  products: CALIPER_WATCHES,
+  music: [],
+  news: [],
+  heroImageUrl: 'https://res.cloudinary.com/trayqxob/image/upload/v1794514660/173888277_2903577833303116_1167198897043818110_n.jpg',
   heroImageOffsetY: 20,
-  heroImageScale: 1.08,
+  heroImageScale: 1.02,
 };
+
+export const QISAGET_ABOUT_SECTIONS = [
+  {
+    title: '1. Mövcud Problem və Rəqəmsal Çətinliklər',
+    content:
+      'Azərbaycan reallığında günümüzdə hər kəs öz işini, fəaliyyətini, xidmətini və ya yaratdığı məhsulu internetdə göstərmək üçün müxtəlif yollara əl atır. Amma ortada böyük bir problem var: hər dəfə yeni bir şeyə başlamaq, hər hansı bir xidməti təqdim etmək və ya insanlara özünü tanıtmaq üçün sıfırdan ayrıca sayt açmaq, yeni səhifələr düzəltmək, o qədər də dərin texniki detallarla baş sındırmaq məcburiyyətində qalırlar. Bu həm vaxt aparır, həm də insanı yorur. Məhz bu nöqtədə QısaGet ortaya çıxır və hər şeyi kökündən dəyişən rahat bir həll təqdim edir.',
+  },
+  {
+    title: '2. QısaGet-in Təməl Məqsədi və Hədəf Auditoriyası',
+    content:
+      'Layihənin təməl məqsədi ondan ibarətdir ki, Azərbaycan ərazisində yaşayan həm fərdi şəxslər, həm öz işini görən ustalar, frilanserlər, influenserlər, həm də müxtəlif obyekt və mağaza sahibləri heç bir çətinlik çəkmədən özlərinə tək bir rəqəmsal ünvan yaratsınlar. İnsanlar artıq hər dəfə ayrı-ayrı səhifələr açmağa ehtiyac duymadan, öz müştərilərini, dostlarını və ya izləyicilərini birbaşa vahid bir platformaya – məhz öz şəxsi QısaGet linkinə yönəldə biləcəklər.',
+  },
+  {
+    title: '3. Platformanın İmkanları və İstifadəçi Təcrübəsi',
+    content:
+      'Bu platforma üzərindən hər kəs öz şəxsi fəaliyyətini, gördüyü işləri, sosial media hesablarını, əlaqə vasitələrini və təklif etdiyi xidmətləri son dərəcə səliqəli şəkildə paylaşa bilir. Ən əsası isə, istəyən hər kəs bu sistem daxilində öz onlayn mağazasını rahatlıqla aça və idarə edə bilər. Qarşı tərəfə baxdıqda isə, yəni səhifəyə daxil olan müştəri və ya izləyici üçün hər şey o qədər sadə və aydın olur ki, həmin şəxsin və ya obyektin tam olaraq nə iş gördüyünü, hansı məhsulları satdığını və ya hansı xidmətləri təklif etdiyini heç bir əlavə çətinlik çəkmədən dərhal başa düşür və anlayır. Heç bir qarışıqlıq, uzun-uzadı axtarışlar olmur; hər şey bir toxunuşla qarşısındadır.',
+  },
+  {
+    title: '4. Hazırkı Sınaq Mərhələsi və Gələcək Baxış',
+    content:
+      'Hazırda layihə tam gücü ilə işə düşməzdən əvvəl aktiv sınaq mərhələsindədir. Bu mərhələnin əsas məqsədi sistemin işlək mexanizmini yoxlamaq, istifadəçilərin platformanı necə qarşıladığını görmək, yarana biləcək çatışmazlıqları aradan qaldırmaq və onu ən rahat, ən tətbiq edilə bilən formaya gətirməkdir. Sınaq dövrü bitdikdən və hər şey ideal vəziyyətə gətirildikdən sonra platforma daha geniş kütlələrə açılacaq və yerli bazarda hər kəsin gündəlik istifadə edəcəyi əsas rəqəmsal alətlərdən birinə çevriləcək.',
+  },
+];
+
+export const QISAGET_PRIVACY_SECTIONS = [
+  {
+    title: '1. Topladığımız Məlumatlar',
+    content:
+      'QısaGet səhifəsində yalnız açıq profil məlumatları (ad, bio, sosial linklər, məhsullar və WhatsApp sifariş əlaqəsi) göstərilir. Ziyarətçilərdən əlavə şəxsi məlumat toplanmır və profilə baxış tam anonim şəkildə həyata keçirilir.',
+  },
+  {
+    title: '2. Məlumatların Saxlanması və Təhlükəsizlik',
+    content:
+      'Platforma məlumatları Google Firebase infrastrukturu üzərində təhlükəsiz şəkildə saxlanılır. Şəxsi e-poçt ünvanları və sistem qeydləri ictimai profil səhifəsində heç vaxt nümayiş etdirilmir.',
+  },
+  {
+    title: '3. Üçüncü Tərəf Keçidləri',
+    content:
+      'Səhifədə yerləşdirilən WhatsApp, Instagram, YouTube, GitHub və mağaza keçidləri müvafiq rəsmi platformalara yönləndirir. Həmin platformaların öz məxfilik qaydaları tətbiq olunur.',
+  },
+  {
+    title: '4. Əlaqə və Məlumat Hüquqları',
+    content:
+      'Məxfilik siyasəti, məlumatların yenilənməsi və ya silinməsi ilə bağlı istənilən sual üçün qisaget.na@gmail.com elektron poçt ünvanı vasitəsilə əlaqə saxlaya bilərsiniz.',
+  },
+];
+
+export const QISAGET_TERMS_SECTIONS = [
+  {
+    title: '1. Platformadan İstifadə Qaydaları',
+    content:
+      'QısaGet istifadəçilərə öz rəqəmsal vizitkartını, layihələrini, sosial hesablarını və mağazasını tək bir ünvanda təqdim etmək imkanı yaradır. Saytdan istifadə tamamilə ödənişsiz və sərbəstdir.',
+  },
+  {
+    title: '2. Məzmun və Müəllif Hüquqları',
+    content:
+      'Səhifədə yerləşdirilən bütün mətnlər, loqolar, layihə keçidləri və məhsul məlumatları müvafiq sahibinə məxsusdur. Qanunsuz məzmun, fişinq və ya zərərli keçidlərin yayılması qəti qadağandır.',
+  },
+  {
+    title: '3. Mağaza və WhatsApp Sifarişləri',
+    content:
+      'Mağaza bölməsində təqdim olunan məhsullar və "Sifariş" düymələri müştərini birbaşa rəsmi WhatsApp xəttinə yönləndirir. Qiymət, çatdırılma və zəmanət şərtləri birbaşa satıcı ilə dəqiqləşdirilir.',
+  },
+  {
+    title: '4. Platforma İnkişafı və Yenilənmələr',
+    content:
+      'QısaGet hazırda aktiv inkişaf mərhələsindədir. İstifadə şərtləri və xüsusiyyətlər vaxtaşırı təkmilləşdirilə bilər; yenilənmiş şərtlər yayımlandığı andan qüvvəyə minir.',
+  },
+];
 
 export const NEWS_CARDS: NewsCard[] = [
   {
     id: 'news-1',
-    title: 'Yaradıcılar üçün Yeni YouTube Alətləri',
-    content: 'YouTube videolarınızı birbaşa bio linkinizdən oynadın və izləyici axınını sürətləndirin. Yeni dinamik pleyer artıq aktivdir.',
-    gradient: 'bg-[#c41200]',
+    title: 'Qisaget Haqqında',
+    content: 'Qısaget — bütün linklərinizi, layihələrinizi və mağazalarınızı tək toxunuşda birləşdirən müasir platformadır.',
+    gradient: 'bg-[#a5d1f8]',
     isWide: true,
-    tag: 'Yenilik',
+    tag: 'Qısaget',
+    thumbnailUrl: '/assets/aistudio/image_4e3c2bd5.png',
   },
   {
     id: 'news-2',
-    title: 'İzləyiciləri Birləşdirən Yeni Funksiyalar',
-    content: 'Sosial media qruplarınızı və eksklüziv abunə kanallarınızı tək kliklə bio kartınızda toplayın.',
-    gradient: 'bg-[#a8dc5a]',
+    title: 'Azərbaycan Respublikasının Dövlət himni',
+    content: 'YouTube videosunu birbaşa izləyin və ya YouTube-da açın.',
+    gradient: 'bg-[#12365c]',
     isWide: true,
-    tag: 'İcma',
+    tag: 'Dövlət Himni',
+    thumbnailUrl: 'https://img.youtube.com/vi/oSixJAPb4L0/maxresdefault.jpg',
+    videoUrl: 'https://youtu.be/oSixJAPb4L0',
   },
 ];
 

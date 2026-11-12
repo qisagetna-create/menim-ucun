@@ -1,5 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Image as ImageIcon, Link as LinkIcon, Upload, Check, MoveVertical, ZoomIn, RotateCcw, ArrowUp, ArrowDown } from 'lucide-react';
+import {
+  X,
+  Image as ImageIcon,
+  Link as LinkIcon,
+  Upload,
+  Camera,
+  Check,
+  MoveVertical,
+  ZoomIn,
+  RotateCcw,
+  ArrowUp,
+  ArrowDown,
+  Loader2,
+} from 'lucide-react';
+import { copyImageUrlToStorage, uploadImageFileToStorage } from '../lib/storage';
+import { useAuth } from '../contexts/AuthContext';
 
 interface PhotoUploaderModalProps {
   isOpen: boolean;
@@ -7,6 +22,7 @@ interface PhotoUploaderModalProps {
   currentImageUrl?: string;
   currentOffsetY?: number;
   currentScale?: number;
+  displayName?: string;
   onSavePhotoSettings: (data: {
     imageUrl: string;
     offsetY: number;
@@ -20,14 +36,18 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
   currentImageUrl = '',
   currentOffsetY = 20,
   currentScale = 1.08,
+  displayName = 'Profil',
   onSavePhotoSettings,
 }) => {
+  const { user } = useAuth();
   const [urlInput, setUrlInput] = useState(currentImageUrl);
   const [previewUrl, setPreviewUrl] = useState(currentImageUrl);
   const [offsetY, setOffsetY] = useState(currentOffsetY);
   const [scale, setScale] = useState(currentScale);
-  const [activeTab, setActiveTab] = useState<'url' | 'upload'>('url');
-  
+  const [activeTab, setActiveTab] = useState<'upload' | 'camera' | 'url'>('upload');
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const isDraggingRef = useRef(false);
   const startYRef = useRef(0);
   const startOffsetRef = useRef(offsetY);
@@ -38,39 +58,77 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
       setPreviewUrl(currentImageUrl);
       setOffsetY(currentOffsetY ?? 20);
       setScale(currentScale ?? 1.08);
+      setErrorMessage(null);
+      setUploadProgress(null);
     }
   }, [isOpen, currentImageUrl, currentOffsetY, currentScale]);
 
   if (!isOpen) return null;
 
-  const handleUrlChange = (val: string) => {
-    setUrlInput(val);
-    setPreviewUrl(val);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    if (!user?.uid) {
+      setErrorMessage('Şəkil yükləmək üçün əvvəlcə /admin bölməsindən daxil olun.');
+      return;
+    }
+
+    setErrorMessage(null);
+    setUploadProgress(5);
+    try {
+      const downloadUrl = await uploadImageFileToStorage(file, {
+        uid: user.uid,
+        folder: 'avatar',
+        onProgress: (pct) => setUploadProgress(pct),
+      });
+      setUrlInput(downloadUrl);
+      setPreviewUrl(downloadUrl);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Şəkil yüklənə bilmədi.');
+    } finally {
+      setTimeout(() => setUploadProgress(null), 500);
+    }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setUrlInput(result);
-        setPreviewUrl(result);
-      };
-      reader.readAsDataURL(file);
+  const handleFetchExternalUrl = async () => {
+    const trimmed = urlInput.trim();
+    if (!trimmed) {
+      setErrorMessage('Zəhmət olmasa şəkil linki daxil edin.');
+      return;
+    }
+    if (!user?.uid) {
+      setErrorMessage('Şəkli yadda saxlamaq üçün əvvəlcə /admin bölməsindən daxil olun.');
+      return;
+    }
+
+    setErrorMessage(null);
+    setUploadProgress(5);
+    try {
+      const storageUrl = await copyImageUrlToStorage(trimmed, {
+        uid: user.uid,
+        folder: 'avatar',
+        onProgress: (pct) => setUploadProgress(pct),
+      });
+      setUrlInput(storageUrl);
+      setPreviewUrl(storageUrl);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Linkdən şəkil köçürülə bilmədi.');
+    } finally {
+      setTimeout(() => setUploadProgress(null), 500);
     }
   };
 
   const handleSave = () => {
     onSavePhotoSettings({
-      imageUrl: urlInput.trim(),
+      imageUrl: previewUrl.trim(),
       offsetY,
       scale,
     });
     onClose();
   };
 
-  // Interactive mouse/touch drag on preview
   const handleMouseDown = (e: React.MouseEvent) => {
     isDraggingRef.current = true;
     startYRef.current = e.clientY;
@@ -80,7 +138,6 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDraggingRef.current) return;
     const deltaY = e.clientY - startYRef.current;
-    // Dragging down moves object-position down (or shows lower part of image)
     const newOffset = Math.max(0, Math.min(100, startOffsetRef.current - deltaY * 0.4));
     setOffsetY(Math.round(newOffset));
   };
@@ -119,7 +176,7 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center border border-black/20 transition-colors"
+          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center border border-black/20 transition-colors cursor-pointer"
           aria-label="Bağla"
         >
           <X className="w-5 h-5 text-black" />
@@ -131,59 +188,128 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
           </div>
           <div>
             <h3 className="text-lg font-bold text-black">Profil Fotosu və Mövqe</h3>
-            <p className="text-xs text-neutral-500">Fotonu dəyişin, qıraqlarını doldurun və yuxarı/aşağı sürüşdürün</p>
+            <p className="text-xs text-neutral-500">
+              Cihaz, kamera və ya link ilə yükləyin (sıxışdırılıb Storage-da saxlanılır)
+            </p>
           </div>
         </div>
 
-        {/* Tab switch */}
-        <div className="flex bg-neutral-100 p-1 rounded-xl border border-black/10 mb-3">
+        {/* 3-Tab switch */}
+        <div className="grid grid-cols-3 gap-1 bg-neutral-100 p-1 rounded-xl border border-black/10 mb-3">
           <button
-            onClick={() => setActiveTab('url')}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeTab === 'url' ? 'bg-white text-black shadow-xs border border-black/10' : 'text-neutral-500'
-            }`}
-          >
-            <LinkIcon className="w-3.5 h-3.5" />
-            Bulud Linki (URL)
-          </button>
-          <button
+            type="button"
             onClick={() => setActiveTab('upload')}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`min-h-[40px] py-1.5 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer ${
               activeTab === 'upload' ? 'bg-white text-black shadow-xs border border-black/10' : 'text-neutral-500'
             }`}
           >
             <Upload className="w-3.5 h-3.5" />
-            Cihazdan Yüklə
+            <span>Cihazdan</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('camera')}
+            className={`min-h-[40px] py-1.5 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer ${
+              activeTab === 'camera' ? 'bg-white text-black shadow-xs border border-black/10' : 'text-neutral-500'
+            }`}
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <span>Kamera</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('url')}
+            className={`min-h-[40px] py-1.5 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer ${
+              activeTab === 'url' ? 'bg-white text-black shadow-xs border border-black/10' : 'text-neutral-500'
+            }`}
+          >
+            <LinkIcon className="w-3.5 h-3.5" />
+            <span>Şəkil Linki</span>
           </button>
         </div>
 
-        {activeTab === 'url' ? (
-          <div className="space-y-2">
+        {activeTab === 'upload' && (
+          <label className="block p-4 border-2 border-dashed border-black/40 rounded-2xl text-center cursor-pointer hover:bg-neutral-50 transition-colors">
+            <Upload className="w-6 h-6 text-neutral-500 mx-auto mb-1" />
+            <span className="text-xs font-bold text-black block">Cihazın yaddaşından fayl seçin</span>
+            <span className="text-[10px] text-neutral-500 block">
+              Avtomatik max 1200px (~500 KB) sıxışdırma ilə yüklənir
+            </span>
             <input
-              type="text"
-              placeholder="https://example.com/menim-fotom.jpg"
-              value={urlInput}
-              onChange={(e) => handleUrlChange(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border-2 border-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#12365c]"
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              disabled={uploadProgress !== null}
+              className="hidden"
             />
+          </label>
+        )}
+
+        {activeTab === 'camera' && (
+          <label className="block p-4 border-2 border-dashed border-black/40 rounded-2xl text-center cursor-pointer hover:bg-neutral-50 transition-colors">
+            <Camera className="w-6 h-6 text-neutral-500 mx-auto mb-1" />
+            <span className="text-xs font-bold text-black block">Kamera ilə çəkin və ya Qalereyadan seçin</span>
+            <span className="text-[10px] text-neutral-500 block">
+              Mobil cihazlarda kamera/qalereya açılır
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileUpload}
+              disabled={uploadProgress !== null}
+              className="hidden"
+            />
+          </label>
+        )}
+
+        {activeTab === 'url' && (
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                type="url"
+                placeholder="https://example.com/menim-fotom.jpg"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                className="flex-1 min-h-[44px] px-3.5 py-2 rounded-xl border-2 border-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#12365c]"
+              />
+              <button
+                type="button"
+                onClick={handleFetchExternalUrl}
+                disabled={uploadProgress !== null}
+                className="min-h-[44px] px-4 py-2 bg-black text-white rounded-xl text-xs font-bold hover:bg-neutral-800 disabled:opacity-60 cursor-pointer shrink-0"
+              >
+                Köçür
+              </button>
+            </div>
             <p className="text-[10px] text-neutral-500">
-              Firebase, Cloudinary, Imgur və ya istənilən veb foto linki.
+              Xarici linkdən şəkil sıxışdırılıb sizin Storage qovluğunuza saxlanacaq.
             </p>
           </div>
-        ) : (
-          <div>
-            <label className="block p-4 border-2 border-dashed border-black/40 rounded-2xl text-center cursor-pointer hover:bg-neutral-50 transition-colors">
-              <Upload className="w-6 h-6 text-neutral-400 mx-auto mb-1" />
-              <span className="text-xs font-bold text-black block">Fotonu seçmək üçün toxunun</span>
-              <span className="text-[10px] text-neutral-500 block">PNG, JPG və ya WebP formatı</span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileUpload}
-                className="hidden"
+        )}
+
+        {uploadProgress !== null && (
+          <div className="mt-3 space-y-1">
+            <div className="flex items-center justify-between text-xs font-bold text-[#12365c]">
+              <span className="flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Şəkil sıxışdırılır və yüklənir...
+              </span>
+              <span>{uploadProgress}%</span>
+            </div>
+            <div className="w-full h-2 bg-neutral-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#12365c] transition-all duration-200"
+                style={{ width: `${uploadProgress}%` }}
               />
-            </label>
+            </div>
           </div>
+        )}
+
+        {errorMessage && (
+          <p className="mt-3 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+            {errorMessage}
+          </p>
         )}
 
         {/* Live Interactive Preview Box */}
@@ -191,7 +317,7 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
           <div className="mt-4 pt-3 border-t border-neutral-200">
             <div className="flex items-center justify-between mb-1.5">
               <p className="text-[11px] font-bold text-neutral-800 uppercase tracking-tight">
-                Canlı Baxış (Mövqeyi əllə də sürüşdürə bilərsiniz):
+                Canlı Baxış (Mövqeyi sürüşdürə bilərsiniz):
               </p>
               <span className="text-[10px] text-neutral-500 font-medium">
                 Mövqe: {offsetY}% · Miqyas: {Math.round(scale * 100)}%
@@ -215,14 +341,13 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
                   objectPosition: `center ${offsetY}%`,
                   transform: `scale(${scale})`,
                 }}
-                onError={() => {}}
               />
 
-              {/* Exact Bottom Gradient Fade overlay */}
               <div
                 className="absolute inset-x-0 bottom-0 h-24 pointer-events-none"
                 style={{
-                  background: 'linear-gradient(to bottom, rgba(165,209,248,0) 0%, rgba(165,209,248,0.2) 30%, rgba(165,209,248,0.7) 65%, rgba(165,209,248,1) 100%)',
+                  background:
+                    'linear-gradient(to bottom, rgba(165,209,248,0) 0%, rgba(165,209,248,0.2) 30%, rgba(165,209,248,0.7) 65%, rgba(165,209,248,1) 100%)',
                 }}
               />
 
@@ -233,14 +358,13 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
 
               <div className="absolute bottom-2 left-0 right-0 text-center pointer-events-none">
                 <span className="text-xs font-bold text-black bg-white/80 px-2.5 py-0.5 rounded-md shadow-xs">
-                  Na.Mexman
+                  {displayName}
                 </span>
               </div>
             </div>
 
             {/* Position & Scale Sliders */}
             <div className="mt-3 bg-neutral-50 p-3 rounded-2xl border border-black/10 space-y-3">
-              {/* Slider 1: Yuxarı / Aşağı Mövqe */}
               <div>
                 <div className="flex items-center justify-between text-xs font-bold text-neutral-800 mb-1">
                   <span className="flex items-center gap-1.5">
@@ -251,7 +375,7 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setOffsetY((prev) => Math.max(0, prev - 5))}
-                      className="px-1.5 py-0.5 bg-white border border-black/20 rounded hover:bg-neutral-100 text-[11px]"
+                      className="px-2 py-1 bg-white border border-black/20 rounded hover:bg-neutral-100 text-[11px]"
                       title="Bir az yuxarı"
                     >
                       <ArrowUp className="w-3 h-3" />
@@ -259,7 +383,7 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setOffsetY((prev) => Math.min(100, prev + 5))}
-                      className="px-1.5 py-0.5 bg-white border border-black/20 rounded hover:bg-neutral-100 text-[11px]"
+                      className="px-2 py-1 bg-white border border-black/20 rounded hover:bg-neutral-100 text-[11px]"
                       title="Bir az aşağı"
                     >
                       <ArrowDown className="w-3 h-3" />
@@ -275,40 +399,8 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
                   onChange={(e) => setOffsetY(Number(e.target.value))}
                   className="w-full h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-black"
                 />
-
-                <div className="flex justify-between text-[10px] text-neutral-500 mt-1">
-                  <button
-                    type="button"
-                    onClick={() => setOffsetY(5)}
-                    className="hover:text-black hover:underline cursor-pointer"
-                  >
-                    Ən Yuxarı (5%)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOffsetY(25)}
-                    className="hover:text-black hover:underline cursor-pointer font-bold text-blue-700"
-                  >
-                    Baş/Üz (25%)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOffsetY(50)}
-                    className="hover:text-black hover:underline cursor-pointer"
-                  >
-                    Mərkəz (50%)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setOffsetY(85)}
-                    className="hover:text-black hover:underline cursor-pointer"
-                  >
-                    Aşağı (85%)
-                  </button>
-                </div>
               </div>
 
-              {/* Slider 2: Miqyas / Qıraqları Doldur */}
               <div className="pt-2 border-t border-neutral-200/60">
                 <div className="flex items-center justify-between text-xs font-bold text-neutral-800 mb-1">
                   <span className="flex items-center gap-1.5">
@@ -330,36 +422,14 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
                   className="w-full h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-black"
                 />
 
-                <div className="flex justify-between text-[10px] text-neutral-500 mt-1">
-                  <button
-                    type="button"
-                    onClick={() => setScale(1.0)}
-                    className="hover:text-black hover:underline cursor-pointer"
-                  >
-                    Standart (100%)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setScale(1.08)}
-                    className="hover:text-black hover:underline cursor-pointer font-bold text-emerald-700"
-                  >
-                    Qıraqları Doldur (108%)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setScale(1.25)}
-                    className="hover:text-black hover:underline cursor-pointer"
-                  >
-                    Böyüt (125%)
-                  </button>
+                <div className="flex justify-end mt-1">
                   <button
                     type="button"
                     onClick={() => {
                       setOffsetY(20);
                       setScale(1.08);
                     }}
-                    className="flex items-center gap-0.5 text-neutral-700 hover:text-black cursor-pointer"
-                    title="İlkin vəziyyətə qaytar"
+                    className="flex items-center gap-1 text-[10px] text-neutral-700 hover:text-black cursor-pointer"
                   >
                     <RotateCcw className="w-2.5 h-2.5" />
                     <span>Sıfırla</span>
@@ -373,14 +443,17 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
         {/* Action Buttons */}
         <div className="flex gap-2 mt-4">
           <button
+            type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 border-2 border-black rounded-xl text-xs font-bold hover:bg-neutral-100 transition-colors cursor-pointer"
+            className="flex-1 min-h-[44px] py-2.5 border-2 border-black rounded-xl text-xs font-bold hover:bg-neutral-100 transition-colors cursor-pointer"
           >
             Ləğv et
           </button>
           <button
+            type="button"
             onClick={handleSave}
-            className="flex-1 py-2.5 bg-black text-white rounded-xl text-xs font-bold hover:bg-neutral-800 brutal-shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            disabled={uploadProgress !== null}
+            className="flex-1 min-h-[44px] py-2.5 bg-black text-white rounded-xl text-xs font-bold hover:bg-neutral-800 brutal-shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-60 cursor-pointer"
           >
             <Check className="w-4 h-4 text-emerald-400" />
             <span>Fotonu Tətbiq Et</span>

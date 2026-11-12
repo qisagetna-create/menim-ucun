@@ -13,18 +13,15 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { QLogo } from './QLogo';
-import { ProfileData } from '../types';
 
 interface LandingViewProps {
-  onNavigateToProfile: () => void;
-  onClaimUsername: (username: string) => void;
-  currentUsername: string;
+  onNavigate: (path: string) => void;
+  defaultProfileSlug?: string;
 }
 
 export const LandingView: React.FC<LandingViewProps> = ({
-  onNavigateToProfile,
-  onClaimUsername,
-  currentUsername,
+  onNavigate,
+  defaultProfileSlug,
 }) => {
   const [showBanner, setShowBanner] = useState(true);
   const [usernameInput, setUsernameInput] = useState('');
@@ -32,10 +29,10 @@ export const LandingView: React.FC<LandingViewProps> = ({
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+    const val = e.target.value.toLowerCase().replace(/[^a-z0-9.-]/g, '');
     setUsernameInput(val);
     if (val.length >= 3) {
-      setUsernameStatus('✓ Bu ad istifadə üçün əlçatandır!');
+      setUsernameStatus('✓ Qeydiyyat üçün /admin bölməsinə davam edin');
     } else if (val.length > 0) {
       setUsernameStatus('Ən azı 3 simvol olmalıdır');
     } else {
@@ -45,9 +42,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
 
   const handleStartFree = (e: React.FormEvent) => {
     e.preventDefault();
-    const finalName = usernameInput.trim() || 'yeni.yaradici';
-    onClaimUsername(finalName);
-    onNavigateToProfile();
+    onNavigate('/admin');
   };
 
   const faqs = [
@@ -61,11 +56,11 @@ export const LandingView: React.FC<LandingViewProps> = ({
     },
     {
       q: 'Rəqəmsal məhsullarımı necə sata bilərəm?',
-      a: 'Dizayn redaktorundan "Mağaza" bölməsini aktivləşdirib məhsulunuzun adını, qiymətini və faylını əlavə edin. İzləyiciləriniz birbaşa linkdən kartla ödəniş edə və faylı yükləyə bilərlər.',
+      a: 'İdarə Panelindən (/admin) "Mağaza" bölməsinə daxil olub məhsulunuzun adını, qiymətini və fotosunu əlavə edin. İzləyiciləriniz birbaşa yaşıl "Sifariş" düyməsi ilə WhatsApp üzərindən sifariş verə bilərlər.',
     },
     {
-      q: 'Öz unikal domeni və ya rənglərimi seçə bilərəm?',
-      a: 'Əlbəttə! Bizimlə dizayn edin bölməsində Klassik Mavi, Günəş Şəfəqi, Nanə, Lavanda və Obsidian kimi xüsusi hazırlanmış neon-brutalist mövzular arasında seçim edə və ya öz brend rənglərinizi təyin edə bilərsiniz.',
+      q: 'Öz unikal ünvanımı və rənglərimi seçə bilərəm?',
+      a: 'Əlbəttə! İdarə Panelində Klassik Mavi, Günəş Şəfəqi, Nanə, Lavanda və Obsidian kimi xüsusi mövzular arasında seçim edə və öz unikal qisaget.az/adiniz linkinizi yarada bilərsiniz.',
     },
   ];
 
@@ -74,14 +69,16 @@ export const LandingView: React.FC<LandingViewProps> = ({
       {/* Top Notification Announcement Banner */}
       {showBanner && (
         <div className="bg-[#7a0022] text-white text-center text-xs sm:text-sm py-3 px-10 relative font-medium">
-          <span>YouTube kanalınızı Qisaget-də gücləndirin. </span>
+          <span>Öz QısaGet profilinizi saniyələr içində yaradın. </span>
           <button
-            onClick={() => onNavigateToProfile()}
-            className="underline font-bold hover:text-amber-200 ml-1 transition-colors"
+            type="button"
+            onClick={() => onNavigate('/admin')}
+            className="underline font-bold hover:text-amber-200 ml-1 transition-colors cursor-pointer"
           >
-            Bu gün qoşulun.
+            İdarə Panelinə Keçin →
           </button>
           <button
+            type="button"
             onClick={() => setShowBanner(false)}
             className="absolute right-4 top-2 text-lg opacity-80 hover:opacity-100 cursor-pointer"
             aria-label="Bağla"
@@ -95,7 +92,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
       <header className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-8">
         {/* Zone 1: Single Wordmark Element */}
         <div
-          onClick={onNavigateToProfile}
+          onClick={() => onNavigate('/')}
           className="flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 group"
         >
           <span className="text-2xl font-black tracking-tighter text-[#12365c]">Qisaget</span>
@@ -109,24 +106,42 @@ export const LandingView: React.FC<LandingViewProps> = ({
           <a href="#features" className="hover:text-black transition-colors whitespace-nowrap shrink-0">
             Xüsusiyyətlər
           </a>
-          <a href="#growth" className="hover:text-black transition-colors whitespace-nowrap shrink-0">
-            Yaradıcılar
-          </a>
           <a href="#faq" className="hover:text-black transition-colors whitespace-nowrap shrink-0">
             Sual-Cavab
           </a>
-          <a href="#contact" className="hover:text-black transition-colors whitespace-nowrap shrink-0">
-            Haqqımızda
-          </a>
+          <button
+            type="button"
+            onClick={() => onNavigate('/mexfilik')}
+            className="hover:text-black transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            Məxfilik
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('/sertler')}
+            className="hover:text-black transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            Şərtlər
+          </button>
         </nav>
 
         {/* Zone 3: Primary Action */}
         <div className="flex items-center gap-3 shrink-0">
+          {defaultProfileSlug && (
+            <button
+              type="button"
+              onClick={() => onNavigate(`/${defaultProfileSlug}`)}
+              className="px-4 py-2 bg-white text-black font-bold text-xs sm:text-sm rounded-full border-2 border-black brutal-shadow-xs hover:-translate-y-0.5 transition-all cursor-pointer hidden sm:flex"
+            >
+              Nümunə Profil
+            </button>
+          )}
           <button
-            onClick={onNavigateToProfile}
-            className="px-5 py-2.5 bg-white text-black font-extrabold text-xs sm:text-sm rounded-full border-2 border-black brutal-shadow hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center gap-2"
+            type="button"
+            onClick={() => onNavigate('/admin')}
+            className="px-5 py-2.5 bg-white text-black font-extrabold text-xs sm:text-sm rounded-full border-2 border-black brutal-shadow hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center gap-2 cursor-pointer"
           >
-            <span>Profilə Bax</span>
+            <span>İdarə Paneli</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -231,10 +246,11 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 </div>
 
                 <button
-                  onClick={onNavigateToProfile}
-                  className="w-full py-2 bg-black text-white text-xs font-bold rounded-xl mt-3 flex items-center justify-center gap-1.5"
+                  type="button"
+                  onClick={() => onNavigate('/admin')}
+                  className="w-full py-2 bg-black text-white text-xs font-bold rounded-xl mt-3 flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <span>Tam Profilə Keç</span>
+                  <span>İndi Başla</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -406,8 +422,9 @@ export const LandingView: React.FC<LandingViewProps> = ({
 
           <div className="pt-2">
             <button
-              onClick={onNavigateToProfile}
-              className="px-8 py-4 bg-[#12365c] text-white font-black text-base rounded-full border-2 border-black brutal-shadow hover:-translate-y-1 active:translate-y-0 transition-transform"
+              type="button"
+              onClick={() => onNavigate('/admin')}
+              className="px-8 py-4 bg-[#12365c] text-white font-black text-base rounded-full border-2 border-black brutal-shadow hover:-translate-y-1 active:translate-y-0 transition-transform cursor-pointer"
             >
               Pulsuz Profil Yarat
             </button>
@@ -424,9 +441,15 @@ export const LandingView: React.FC<LandingViewProps> = ({
             <span>— Sadə bir linkdə bütün dünya</span>
           </div>
 
-          <div className="flex gap-4">
-            <button onClick={onNavigateToProfile} className="hover:text-black">
-              Profil Görünüşü
+          <div className="flex flex-wrap justify-center gap-4">
+            <button type="button" onClick={() => onNavigate('/admin')} className="hover:text-black cursor-pointer">
+              İdarə Paneli
+            </button>
+            <button type="button" onClick={() => onNavigate('/mexfilik')} className="hover:text-black cursor-pointer">
+              Məxfilik
+            </button>
+            <button type="button" onClick={() => onNavigate('/sertler')} className="hover:text-black cursor-pointer">
+              Şərtlər
             </button>
             <a href="mailto:qisaget.na@gmail.com" className="hover:text-black">
               Dəstək: qisaget.na@gmail.com

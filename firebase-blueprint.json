@@ -1,0 +1,162 @@
+{
+  "entities": {
+    "Profile": {
+      "title": "Profile",
+      "description": "Public creator bio link page and storefront configuration keyed by unique username.",
+      "type": "object",
+      "properties": {
+        "ownerUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the profile owner.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "username": {
+          "type": "string",
+          "description": "Unique public URL slug for the profile (3-24 lowercase chars, digits, dot, hyphen).",
+          "minLength": 3,
+          "maxLength": 24,
+          "pattern": "^[a-z0-9.-]{3,24}$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name shown on the public profile.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "bio": {
+          "type": "string",
+          "description": "Short biography text shown under the display name.",
+          "maxLength": 400
+        },
+        "avatar": {
+          "type": "string",
+          "format": "uri",
+          "description": "Firebase Storage HTTPS URL for the profile hero/avatar image.",
+          "maxLength": 1000
+        },
+        "avatarOffsetY": {
+          "type": "number",
+          "description": "Vertical focal position percentage (0-100) for the hero image."
+        },
+        "avatarScale": {
+          "type": "number",
+          "description": "Zoom scale factor (0.5-3.0) for the hero image."
+        },
+        "theme": {
+          "type": "string",
+          "description": "Selected visual theme identifier.",
+          "enum": ["classic-blue", "sunset-peach", "mint-fresh", "lavender-dream", "dark-obsidian"],
+          "maxLength": 40
+        },
+        "socials": {
+          "type": "object",
+          "description": "Map of social links (instagram, tiktok, whatsapp, telegram, youtube, facebook, linkedin, discord)."
+        },
+        "links": {
+          "type": "array",
+          "description": "Ordered list of custom link capsules shown in the Ev tab (max 50)."
+        },
+        "products": {
+          "type": "array",
+          "description": "Ordered list of products shown in the Magaza tab (max 50)."
+        },
+        "music": {
+          "type": "array",
+          "description": "Ordered list of Mixtape audio tracks shown in the Ev tab (max 30)."
+        },
+        "news": {
+          "type": "array",
+          "description": "Ordered list of media/info cards shown in the Ev carousel (max 20)."
+        },
+        "wa": {
+          "type": "string",
+          "description": "Owner WhatsApp phone digits used for direct Sifaris order buttons.",
+          "maxLength": 20
+        },
+        "verified": {
+          "type": "boolean",
+          "description": "Platform verification badge status (admin-controlled)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the profile was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the latest update."
+        }
+      },
+      "required": [
+        "ownerUid",
+        "username",
+        "name",
+        "bio",
+        "avatar",
+        "theme",
+        "socials",
+        "links",
+        "products",
+        "music",
+        "news",
+        "wa",
+        "verified",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Private user account mapping Firebase UID to claimed username and email.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "username": {
+          "type": "string",
+          "description": "Claimed profile username.",
+          "minLength": 3,
+          "maxLength": 24,
+          "pattern": "^[a-z0-9.-]{3,24}$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Private user email address (PII - strictly owner/admin read only).",
+          "maxLength": 254
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": ["uid", "username", "email", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/profiles/{username}": {
+      "schema": {
+        "$ref": "#/entities/Profile"
+      },
+      "description": "Publicly gettable creator bio link and shop documents keyed by unique lowercase username."
+    },
+    "/users/{uid}": {
+      "schema": {
+        "$ref": "#/entities/UserAccount"
+      },
+      "description": "Private UID-to-username ownership mapping and email PII strictly isolated to owner and admin."
+    }
+  }
+}

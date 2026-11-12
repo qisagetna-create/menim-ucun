@@ -1,0 +1,207 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny all unless explicitly matched and permitted
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HARDENED PRIMITIVES ---
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'qisaget.na@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidUid(uid) {
+      return uid is string && uid.size() >= 1 && uid.size() <= 128 && uid.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isReservedUsername(username) {
+      return username in [
+        'admin', 'login', 'giris', 'api', 'qeydiyyat', 'mexfilik',
+        'privacy', 'terms', 'sertler', 'about', 'haqqinda', 'support',
+        'destek', 'qisaget', 'root', 'system', 'auth', 'settings',
+        'logout', 'cixis', '404', 'profile', 'profiles', 'user', 'users', 'test'
+      ];
+    }
+
+    function isValidUsername(username) {
+      return username is string
+        && username.size() >= 3
+        && username.size() <= 24
+        && username.matches('^[a-z0-9.\\-]+$')
+        && !username.matches('^\\..*|.*\\.$|.*\\.\\..*')
+        && !isReservedUsername(username);
+    }
+
+    function isSafeImageOrEmptyUrl(val) {
+      return val is string
+        && val.size() <= 1000
+        && (val == '' || val.matches('^(https://|http://|/assets/).*'));
+    }
+
+    function isValidOptionalSocial(socials, key) {
+      return !(key in socials) || (
+        socials[key] is string
+        && socials[key].size() <= 300
+        && (socials[key] == '' || socials[key].matches('^(https://|http://).*'))
+      );
+    }
+
+    function isValidSocials(socials) {
+      return socials is map
+        && socials.keys().hasOnly(['instagram', 'whatsapp', 'tiktok', 'telegram', 'youtube', 'facebook', 'linkedin', 'discord'])
+        && isValidOptionalSocial(socials, 'instagram')
+        && isValidOptionalSocial(socials, 'whatsapp')
+        && isValidOptionalSocial(socials, 'tiktok')
+        && isValidOptionalSocial(socials, 'telegram')
+        && isValidOptionalSocial(socials, 'youtube')
+        && isValidOptionalSocial(socials, 'facebook')
+        && isValidOptionalSocial(socials, 'linkedin')
+        && isValidOptionalSocial(socials, 'discord');
+    }
+
+    function isValidProfile(data, pathUsername) {
+      return data.keys().hasAll([
+          'ownerUid', 'username', 'name', 'bio', 'avatar', 'theme',
+          'socials', 'links', 'products', 'music', 'news', 'wa',
+          'verified', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerUid', 'username', 'name', 'bio', 'avatar',
+          'avatarOffsetY', 'avatarScale', 'theme', 'socials',
+          'links', 'products', 'music', 'news', 'wa',
+          'verified', 'createdAt', 'updatedAt'
+        ])
+        && isValidUid(data.ownerUid)
+        && data.username is string
+        && data.username == pathUsername
+        && isValidUsername(data.username)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.bio is string && data.bio.size() <= 400
+        && isSafeImageOrEmptyUrl(data.avatar)
+        && (!('avatarOffsetY' in data) || (data.avatarOffsetY is number && data.avatarOffsetY >= 0 && data.avatarOffsetY <= 100))
+        && (!('avatarScale' in data) || (data.avatarScale is number && data.avatarScale >= 0.5 && data.avatarScale <= 3.0))
+        && data.theme is string && data.theme.size() >= 1 && data.theme.size() <= 40
+        && data.theme in ['classic-blue', 'sunset-peach', 'mint-fresh', 'lavender-dream', 'dark-obsidian']
+        && isValidSocials(data.socials)
+        && data.links is list && data.links.size() <= 50 && (data.links.size() == 0 || data.links[0] is map)
+        && data.products is list && data.products.size() <= 50 && (data.products.size() == 0 || data.products[0] is map)
+        && data.music is list && data.music.size() <= 30 && (data.music.size() == 0 || data.music[0] is map)
+        && data.news is list && data.news.size() <= 20 && (data.news.size() == 0 || data.news[0] is map)
+        && data.wa is string && data.wa.size() <= 20
+        && data.verified is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserDoc(data, pathUid) {
+      return data.keys().hasAll(['uid', 'username', 'email', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'username', 'email', 'createdAt', 'updatedAt'])
+        && isValidUid(data.uid)
+        && data.uid == pathUid
+        && isValidUsername(data.username)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 254
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // --- COLLECTION: /profiles/{username} ---
+    match /profiles/{username} {
+      allow get: if isValidUsername(username);
+      allow list: if isSignedIn() && (resource.data.ownerUid == request.auth.uid || isAdmin());
+
+      allow create: if isVerifiedUser()
+        && isValidUsername(username)
+        && isValidProfile(incoming(), username)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (isAdmin() || (incoming().ownerUid == request.auth.uid && incoming().verified == false))
+        && existsAfter(/databases/$(database)/documents/users/$(request.auth.uid))
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.username == username;
+
+      allow update: if isVerifiedUser()
+        && isValidUsername(username)
+        && isValidProfile(incoming(), username)
+        && incoming().ownerUid == existing().ownerUid
+        && incoming().username == existing().username
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().ownerUid == request.auth.uid
+            && incoming().verified == existing().verified
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'bio', 'avatar', 'avatarOffsetY', 'avatarScale',
+              'theme', 'socials', 'links', 'products', 'music', 'news',
+              'wa', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isVerifiedUser()
+        && isValidUsername(username)
+        && (existing().ownerUid == request.auth.uid || isAdmin());
+    }
+
+    // --- COLLECTION: /users/{uid} (PII Isolated) ---
+    match /users/{uid} {
+      allow get: if isSignedIn() && isValidUid(uid) && (request.auth.uid == uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+
+      allow create: if isVerifiedUser()
+        && isValidUid(uid)
+        && request.auth.uid == uid
+        && isValidUserDoc(incoming(), uid)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && existsAfter(/databases/$(database)/documents/profiles/$(incoming().username))
+        && getAfter(/databases/$(database)/documents/profiles/$(incoming().username)).data.ownerUid == request.auth.uid;
+
+      allow update: if isVerifiedUser()
+        && isValidUid(uid)
+        && (request.auth.uid == uid || isAdmin())
+        && isValidUserDoc(incoming(), uid)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (request.auth.uid == uid && incoming().diff(existing()).affectedKeys().hasOnly(['username', 'email', 'updatedAt']))
+        )
+        && existsAfter(/databases/$(database)/documents/profiles/$(incoming().username))
+        && getAfter(/databases/$(database)/documents/profiles/$(incoming().username)).data.ownerUid == existing().uid;
+
+      allow delete: if isVerifiedUser()
+        && isValidUid(uid)
+        && (request.auth.uid == uid || isAdmin());
+    }
+
+    // --- COLLECTION: /admins/{uid} (Read-own only, locked against client escalation) ---
+    match /admins/{uid} {
+      allow get: if isSignedIn() && isValidUid(uid) && (request.auth.uid == uid || isAdmin());
+      allow list, create, update, delete: if false;
+    }
+  }
+}

@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Public read access for published profile avatars and product photos
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Users may write/delete only inside their own users/{uid}/ directory,
+    // strictly limited to valid image MIME types and max 1 MB file size.
+    match /users/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.uid == userId
+        && request.resource != null
+        && request.resource.size <= 1048576
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.uid == userId;
+    }
+  }
+}

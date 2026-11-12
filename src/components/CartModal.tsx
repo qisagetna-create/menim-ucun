@@ -131,9 +131,13 @@ export const CartModal: React.FC<CartModalProps> = ({
                   className="flex items-center gap-3 p-3 bg-neutral-50 border border-black/15 rounded-2xl"
                 >
                   <div
-                    className="w-12 h-12 rounded-xl border border-black/20 shrink-0"
-                    style={{ background: product.gradient }}
-                  />
+                    className="w-12 h-12 rounded-xl border border-black/20 shrink-0 bg-white overflow-hidden flex items-center justify-center p-0.5"
+                    style={{ background: product.imageUrl ? '#ffffff' : product.gradient }}
+                  >
+                    {product.imageUrl ? (
+                      <img src={product.imageUrl} alt={product.title} className="w-full h-full object-contain" />
+                    ) : null}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <h5 className="text-xs font-bold text-black truncate">{product.title}</h5>
                     <p className="text-xs text-neutral-600 font-semibold">

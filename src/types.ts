@@ -21,12 +21,18 @@ export interface ProductItem {
   id: string;
   title: string;
   price: number;
+  originalPrice?: number;
+  discountPercent?: number;
   currency: string;
-  category: 'Rəqəmsal' | 'Merç' | 'Xidmət';
+  category: 'Saat' | 'Rəqəmsal' | 'Merç' | 'Xidmət';
   description: string;
-  gradient: string;
+  gradient?: string;
   rating: number;
+  reviewCount?: number;
   badge?: string;
+  imageUrl?: string;
+  colorName?: string;
+  colorHex?: string;
 }
 
 export interface MixtapeTrack {
@@ -45,6 +51,8 @@ export interface NewsCard {
   gradient: string;
   isWide: boolean;
   tag: string;
+  thumbnailUrl?: string;
+  videoUrl?: string;
 }
 
 export interface CreatorProfile {
@@ -66,25 +74,41 @@ export interface InstagramPost {
   timeAgo: string;
 }
 
+export interface SocialLinks {
+  instagram: string;
+  whatsapp: string;
+  tiktok: string;
+  telegram?: string;
+  youtube?: string;
+  facebook: string;
+  linkedin: string;
+  discord?: string;
+}
+
 export interface ProfileData {
+  ownerUid?: string;
   username: string;
   displayName: string;
   bio: string;
   isVerified: boolean;
   themeId: string;
-  socials: {
-    instagram: string;
-    whatsapp: string;
-    tiktok: string;
-    facebook: string;
-    linkedin: string;
-    youtube?: string;
-    discord?: string;
-    email?: string;
-  };
+  wa: string;
+  socials: SocialLinks;
   links: CustomLink[];
   products: ProductItem[];
+  music: MixtapeTrack[];
+  news: NewsCard[];
   heroImageUrl?: string;
   heroImageOffsetY?: number;
   heroImageScale?: number;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+export interface UserAccountDoc {
+  uid: string;
+  username: string;
+  email: string;
+  createdAt?: unknown;
+  updatedAt?: unknown;
 }
