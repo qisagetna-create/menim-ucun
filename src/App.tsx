@@ -8,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import {
   createNaMexmanTemplateProfile,
+  getLocalProfileOverride,
   subscribeToProfile,
 } from './lib/firestoreProfiles';
 import { getFirebaseErrorMessageAz } from './lib/firebase';
@@ -232,7 +233,8 @@ export default function App() {
   if (profileState.status === 'notfound') {
     // On root /, show the original Na.Mexman interface until profiles/na.mexman is saved in Firestore
     if (route.kind === 'root') {
-      const initialViewProfile: ProfileData = {
+      const localOverride = getLocalProfileOverride('na.mexman');
+      const initialViewProfile: ProfileData = localOverride || {
         ...createNaMexmanTemplateProfile(''),
         isVerified: true,
       };
@@ -248,7 +250,9 @@ export default function App() {
     return <NotFoundView requestedSlug={route.username} onNavigate={navigate} />;
   }
 
-  const profileData = profileState.data!;
+  const localOverride =
+    profileState.data?.username === 'na.mexman' ? getLocalProfileOverride('na.mexman') : null;
+  const profileData = localOverride || profileState.data!;
 
   return (
     <div className="w-full min-h-screen">

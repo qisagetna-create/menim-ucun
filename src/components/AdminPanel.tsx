@@ -7,15 +7,18 @@ import {
   Check,
   Copy,
   ExternalLink,
+  Eye,
+  EyeOff,
+  FileText,
   Film,
   Globe,
   Image as ImageIcon,
   Link2,
   Loader2,
+  Lock,
   LogOut,
   Mail,
   Menu,
-  Music,
   Palette,
   Plus,
   Save,
@@ -29,12 +32,12 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { getFirebaseErrorMessageAz } from '../lib/firebase';
 import {
-  claimUsernameAndCreateProfile,
   createNaMexmanTemplateProfile,
+  getLocalProfileOverride,
   isPlatformAdminEmail,
+  saveLocalProfileOverride,
   saveProfileChanges,
   subscribeToProfile,
-  subscribeToUserAccount,
 } from '../lib/firestoreProfiles';
 import { buildWhatsappOrderUrl } from '../lib/sanitize';
 import {
@@ -105,7 +108,7 @@ const SECTION_META: Array<{
   {
     id: 'linkler',
     label: 'Ana Səhifə Linkləri',
-    desc: 'DRIVED, RestoWeb, Caliper, Github və digər əsas link kartları',
+    desc: 'RestoWeb, Caliper, Github və digər əsas link kartları',
     icon: Link2,
   },
   {
@@ -122,9 +125,9 @@ const SECTION_META: Array<{
   },
   {
     id: 'musiqi',
-    label: 'Musiqi (Miksteyp)',
-    desc: 'Miksteyp siyahısı, treklər və audio parametrləri',
-    icon: Music,
+    label: 'Elmlə Bağlı Mühazirələrim (PDF)',
+    desc: 'Elmi işlər, mühazirə PDF linkləri və qapaq fotoları',
+    icon: FileText,
   },
   {
     id: 'onizleme',
@@ -163,12 +166,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
   const {
     user,
     authReady,
-    needsEmailConfirmationForLink,
+    isAdminAuthenticated,
     authError,
     clearAuthError,
-    signInWithGoogle,
-    sendEmailLoginLink,
-    confirmEmailForPendingLink,
+    loginAdminWithCredentials,
     logout,
   } = useAuth();
 
@@ -255,12 +256,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
 
   // Auth form states
   const [loginEmail, setLoginEmail] = useState('');
-  const [emailLinkSent, setEmailLinkSent] = useState(false);
-  const [confirmEmailInput, setConfirmEmailInput] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
 
-  // Firestore user -> profile state
-  const [userDoc, setUserDoc] = useState<UserAccountDoc | null | undefined>(undefined);
+  // Firestore + local admin profile state
   const [targetUsername, setTargetUsername] = useState<string | null>(null);
   const [draft, setDraft] = useState<ProfileData | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -276,57 +276,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
 
   const isDirtyRef = useRef(false);
   isDirtyRef.current = isDirty;
-  const autoProvisionUidRef = useRef<string | null>(null);
 
-  const isAdminAccount = Boolean(
-    user &&
-      (isPlatformAdminEmail(user.email, user.emailVerified) ||
-        user.email?.trim().toLowerCase() === 'qisaget.na@gmail.com')
-  );
-
-  // Subscribe to users/{uid} (or immediately select na.mexman for the admin Gmail)
+  // Enable admin target profile strictly when authenticated via Admin login
   useEffect(() => {
-    if (!authReady || !user) {
-      setUserDoc(undefined);
+    if (!authReady || !isAdminAuthenticated) {
       setTargetUsername(null);
       setDraft(null);
-      autoProvisionUidRef.current = null;
+      setIsDirty(false);
       return;
     }
+    setTargetUsername('na.mexman');
+  }, [authReady, isAdminAuthenticated]);
 
-    if (isAdminAccount) {
-      setUserDoc(null);
-      setTargetUsername('na.mexman');
-      return;
-    }
-
-    const unsub = subscribeToUserAccount(
-      user.uid,
-      (docData) => {
-        setUserDoc(docData);
-        if (docData?.username) {
-          setTargetUsername(docData.username);
-        } else {
-          setTargetUsername(null);
-        }
-      },
-      (err) => {
-        setUserDoc(null);
-        setStatusBanner({
-          type: 'error',
-          text: getFirebaseErrorMessageAz(err),
-        });
-      }
-    );
-
-    return () => unsub();
-  }, [authReady, user, isAdminAccount]);
-
-  // Subscribe to profiles/{targetUsername} and auto-open Admin Panel for the admin Gmail
+  // Subscribe to profiles/na.mexman and fall back cleanly to local saved profile or template
   useEffect(() => {
-    if (!targetUsername || !user) {
+    if (!targetUsername || !isAdminAuthenticated) {
       setLoadingProfile(false);
       return;
+    }
+
+    const localSaved = getLocalProfileOverride(targetUsername);
+    if (localSaved) {
+      setDraft((prev) => (prev && isDirtyRef.current ? prev : localSaved));
     }
 
     setLoadingProfile(true);
@@ -334,47 +305,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
       targetUsername,
       (remoteProfile) => {
         setLoadingProfile(false);
+        const preferred = getLocalProfileOverride(targetUsername) || remoteProfile;
         setDraft((prev) => {
           if (prev && isDirtyRef.current) return prev;
-          return remoteProfile;
+          return preferred;
         });
       },
       () => {
         setLoadingProfile(false);
-        if (isAdminAccount && targetUsername === 'na.mexman') {
-          const starter = createNaMexmanTemplateProfile(user.uid);
-          setDraft((prev) => prev ?? starter);
-
-          if (autoProvisionUidRef.current !== user.uid) {
-            autoProvisionUidRef.current = user.uid;
-            claimUsernameAndCreateProfile({
-              uid: user.uid,
-              email: user.email || 'qisaget.na@gmail.com',
-              username: 'na.mexman',
-              profile: starter,
-            }).catch((err) => {
-              console.warn('Profil avtomatik bazaya yazılarkən xəta:', err);
-            });
-          }
-        } else {
-          setDraft(null);
-        }
+        const preferred =
+          getLocalProfileOverride(targetUsername) ||
+          createNaMexmanTemplateProfile(user?.uid || 'admin-na-mexman');
+        setDraft((prev) => prev ?? preferred);
       },
-      (err) => {
+      () => {
         setLoadingProfile(false);
-        if (isAdminAccount && targetUsername === 'na.mexman') {
-          const starter = createNaMexmanTemplateProfile(user.uid);
-          setDraft((prev) => prev ?? starter);
-        }
-        setStatusBanner({
-          type: 'error',
-          text: getFirebaseErrorMessageAz(err),
-        });
+        const preferred =
+          getLocalProfileOverride(targetUsername) ||
+          createNaMexmanTemplateProfile(user?.uid || 'admin-na-mexman');
+        setDraft((prev) => prev ?? preferred);
       }
     );
 
     return () => unsub();
-  }, [targetUsername, user, isAdminAccount]);
+  }, [targetUsername, isAdminAuthenticated, user?.uid]);
 
   const updateDraft = (updater: (prev: ProfileData) => ProfileData) => {
     setDraft((prev) => {
@@ -385,19 +339,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
   };
 
   const handleSave = async () => {
-    if (!draft || !user) return;
+    if (!draft) return;
     setSaving(true);
     setStatusBanner(null);
     try {
-      await saveProfileChanges(
-        draft.username,
-        draft.ownerUid || user.uid,
-        draft
-      );
+      saveLocalProfileOverride(draft.username, draft);
+      if (user && isPlatformAdminEmail(user.email, user.emailVerified)) {
+        await saveProfileChanges(
+          draft.username,
+          draft.ownerUid || user.uid,
+          draft
+        );
+      }
       setIsDirty(false);
       setStatusBanner({
         type: 'success',
-        text: 'Bütün dəyişikliklər Firebase-də yadda saxlanıldı.',
+        text: 'Bütün dəyişikliklər yadda saxlanıldı.',
       });
     } catch (err) {
       setStatusBanner({
@@ -407,6 +364,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setLoginPassword('');
+    setShowPassword(false);
+    goBackOrReplace('/');
   };
 
 
@@ -464,8 +428,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
     );
   }
 
-  // Unauthenticated view -> Login required
-  if (!user) {
+  // Unauthenticated view -> Email & Password Login required
+  if (!isAdminAuthenticated) {
     return (
       <div className="min-h-screen bg-[#a5d1f8] text-black flex flex-col">
         {/* Clean top bar: Qisaget */}
@@ -491,142 +455,102 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
 
         <main className="flex-1 flex items-center justify-center p-5 sm:p-8">
           <div className="w-full max-w-md bg-white border-2 border-black rounded-[28px] brutal-shadow p-7 sm:p-8 space-y-6">
-            <div className="text-center space-y-2">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-[#a5d1f8] border-2 border-black flex items-center justify-center brutal-shadow-sm">
-                <QLogo size={30} strokeWidth={9} />
+            <div className="text-center space-y-2.5">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-[#a5d1f8] border-2 border-black flex items-center justify-center brutal-shadow-sm">
+                <QLogo size={34} strokeWidth={9} />
               </div>
-              <h1 className="text-2xl font-black tracking-tight text-black">Admin Girişi</h1>
-              <p className="text-sm text-neutral-600 leading-relaxed">
-                Profil, linklər, videolar və mağaza məhsullarını idarə etmək üçün daxil olun.
-              </p>
+              <h1 className="text-2xl font-black tracking-tight text-black">Qisaget</h1>
+              <p className="text-xs font-semibold text-neutral-500">Admin Girişi</p>
             </div>
 
             {authError && (
-              <div className="p-3.5 rounded-2xl bg-red-50 border-2 border-red-300 text-xs font-semibold text-red-800">
+              <div className="p-3.5 rounded-2xl bg-red-50 border-2 border-red-300 text-xs font-semibold text-red-800 text-center">
                 {authError}
               </div>
             )}
 
-            {needsEmailConfirmationForLink ? (
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  setAuthBusy(true);
-                  try {
-                    await confirmEmailForPendingLink(confirmEmailInput);
-                  } finally {
-                    setAuthBusy(false);
-                  }
-                }}
-                className="space-y-4"
-              >
-                <p className="text-xs font-semibold text-neutral-700">
-                  Giriş linkini tamamlamaq üçün e-poçt ünvanınızı təsdiqləyin:
-                </p>
-                <input
-                  type="email"
-                  required
-                  value={confirmEmailInput}
-                  onChange={(e) => setConfirmEmailInput(e.target.value)}
-                  placeholder="qisaget.na@gmail.com"
-                  className="w-full min-h-[46px] px-4 py-2.5 border-2 border-black rounded-xl text-sm font-medium focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={authBusy}
-                  className="w-full min-h-[48px] bg-black text-white rounded-xl font-bold text-sm hover:bg-neutral-800 cursor-pointer"
-                >
-                  {authBusy ? 'Yoxlanılır...' : 'Girişi Təsdiqlə'}
-                </button>
-              </form>
-            ) : (
-              <div className="space-y-5">
-                <button
-                  type="button"
-                  disabled={authBusy}
-                  onClick={async () => {
-                    clearAuthError();
-                    setAuthBusy(true);
-                    try {
-                      await signInWithGoogle();
-                    } finally {
-                      setAuthBusy(false);
-                    }
-                  }}
-                  className="w-full min-h-[50px] px-5 py-3 bg-white hover:bg-neutral-50 border-2 border-black rounded-2xl brutal-shadow-sm font-bold text-sm flex items-center justify-center gap-3 transition-transform hover:-translate-y-0.5 cursor-pointer"
-                >
-                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96z"
-                    />
-                  </svg>
-                  <span>Google ilə Daxil Ol</span>
-                </button>
-
-                <div className="relative flex items-center justify-center">
-                  <div className="border-t border-black/15 w-full" />
-                  <span className="bg-white px-3 text-xs font-semibold text-neutral-500">və ya</span>
-                  <div className="border-t border-black/15 w-full" />
-                </div>
-
-                {emailLinkSent ? (
-                  <div className="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-500 text-xs font-semibold text-emerald-900 space-y-2">
-                    <p>Giriş linki <b>{loginEmail}</b> ünvanına göndərildi.</p>
-                    <p className="text-emerald-700">E-poçtunuzu açıb linkə klikləyin.</p>
-                  </div>
-                ) : (
-                  <form
-                    onSubmit={async (e) => {
-                      e.preventDefault();
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                clearAuthError();
+                setAuthBusy(true);
+                try {
+                  await loginAdminWithCredentials(loginEmail, loginPassword);
+                  setLoginPassword('');
+                  setShowPassword(false);
+                } catch {
+                  // Error handled cleanly via AuthContext authError
+                } finally {
+                  setAuthBusy(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <label className="block text-xs font-extrabold text-black">
+                  E-mailinizi Yazın
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={loginEmail}
+                    onChange={(e) => {
                       clearAuthError();
-                      setAuthBusy(true);
-                      try {
-                        await sendEmailLoginLink(loginEmail);
-                        setEmailLinkSent(true);
-                      } catch {
-                        // Error handled in AuthContext
-                      } finally {
-                        setAuthBusy(false);
-                      }
+                      setLoginEmail(e.target.value);
                     }}
-                    className="space-y-3"
-                  >
-                    <label className="block text-xs font-bold text-neutral-700">
-                      E-poçt linki ilə daxil ol
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder="adiniz@gmail.com"
-                      className="w-full min-h-[46px] px-4 py-2.5 bg-neutral-50 border-2 border-black rounded-xl text-sm font-medium focus:outline-none"
-                    />
-                    <button
-                      type="submit"
-                      disabled={authBusy}
-                      className="w-full min-h-[48px] px-5 py-3 bg-[#12365c] hover:bg-[#0e2a48] text-white rounded-2xl font-bold text-sm flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <Mail className="w-4 h-4" />
-                      <span>E-poçta Giriş Linki Göndər</span>
-                    </button>
-                  </form>
-                )}
+                    placeholder="E-mailinizi yazın"
+                    className="w-full min-h-[48px] pl-10 pr-4 py-2.5 bg-neutral-50 border-2 border-black rounded-xl text-sm font-medium focus:outline-none focus:bg-white"
+                  />
+                </div>
               </div>
-            )}
+
+              <div className="space-y-2">
+                <label className="block text-xs font-extrabold text-black">
+                  Şifrənizi Yazın
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    autoComplete="current-password"
+                    value={loginPassword}
+                    onChange={(e) => {
+                      clearAuthError();
+                      setLoginPassword(e.target.value);
+                    }}
+                    placeholder="Şifrənizi yazın"
+                    className="w-full min-h-[48px] pl-10 pr-11 py-2.5 bg-neutral-50 border-2 border-black rounded-xl text-sm font-medium focus:outline-none focus:bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-neutral-500 hover:text-black cursor-pointer"
+                    aria-label={showPassword ? 'Şifrəni gizlət' : 'Şifrəni göstər'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={authBusy}
+                className="w-full min-h-[50px] px-5 py-3 bg-[#12365c] hover:bg-[#0e2a48] text-white border-2 border-black rounded-2xl brutal-shadow-sm font-bold text-sm flex items-center justify-center gap-2 transition-transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+              >
+                {authBusy ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Yoxlanılır...</span>
+                  </>
+                ) : (
+                  <span>Daxil Ol</span>
+                )}
+              </button>
+            </form>
           </div>
         </main>
       </div>
@@ -634,7 +558,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
   }
 
   // Waiting for initial profile lookup
-  if ((userDoc === undefined && !isAdminAccount) || loadingProfile) {
+  if (!draft && loadingProfile) {
     return (
       <div className="min-h-screen bg-[#f4f7fb] flex items-center justify-center p-6">
         <div className="bg-white border-2 border-black rounded-[28px] brutal-shadow p-8 text-center space-y-3">
@@ -645,72 +569,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
     );
   }
 
-  // Only reached if signed in with a non-admin Gmail that has no profile
   if (!draft) {
-    return (
-      <div className="min-h-screen bg-[#a5d1f8] text-black flex flex-col">
-        <header className="w-full bg-white border-b-2 border-black px-5 sm:px-8 py-4 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => onNavigate('/')}
-            className="flex items-center gap-2.5 cursor-pointer whitespace-nowrap shrink-0"
-          >
-            <QLogo size={24} strokeWidth={9} />
-            <span className="text-xl font-black tracking-tight text-black">Qisaget</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('/')}
-            className="min-h-[44px] px-4 py-2 bg-neutral-100 hover:bg-neutral-200 border-2 border-black rounded-full text-xs font-bold flex items-center gap-2 cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Sayta Qayıt</span>
-          </button>
-        </header>
-
-        <main className="flex-1 flex items-center justify-center p-5 sm:p-8">
-          <div className="w-full max-w-md bg-white border-2 border-black rounded-[28px] brutal-shadow p-7 sm:p-8 text-center space-y-5">
-            <h1 className="text-xl font-black text-black">Admin Hesabı Tələb Olunur</h1>
-            <p className="text-sm text-neutral-600 leading-relaxed">
-              Hazırda <span className="font-bold text-black">{user.email}</span> hesabı ilə daxil
-              olmusunuz. Admin panelini açmaq üçün əsas admin Gmail hesabı ilə daxil olun.
-            </p>
-            <button
-              type="button"
-              onClick={() => logout()}
-              className="w-full min-h-[48px] px-5 py-3 bg-[#12365c] hover:bg-[#0d2a48] text-white rounded-2xl text-sm font-bold flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Başqa Hesabla Daxil Ol</span>
-            </button>
-          </div>
-        </main>
-      </div>
-    );
+    return null;
   }
 
   return (
     <div className="min-h-screen bg-[#f3f6fa] text-black flex flex-col">
-      {/* TOP BAR: Qisaget (left) + Yadda Saxla & 3 Parallel Lines Hamburger (far right) */}
-      <header className="sticky top-0 z-30 w-full bg-white border-b-2 border-black px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
+      {/* TOP BAR: Qisaget (left) + Yadda Saxla, Çıxış & 3 Parallel Lines Hamburger (right) */}
+      <header className="sticky top-0 z-30 w-full bg-white border-b-2 border-black px-3 sm:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
         <button
           type="button"
           onClick={() => onNavigate('/')}
-          className="flex items-center gap-2.5 cursor-pointer whitespace-nowrap shrink-0"
+          className="flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
           title="Profilə qayıt"
         >
-          <QLogo size={24} strokeWidth={9} />
-          <span className="text-xl sm:text-[22px] font-black tracking-tight text-black">
+          <QLogo size={22} strokeWidth={9} />
+          <span className="text-lg sm:text-[22px] font-black tracking-tight text-black">
             Qisaget
           </span>
         </button>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           <button
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className={`min-h-[42px] px-4 sm:px-5 py-2 rounded-full border-2 border-black text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+            className={`min-h-[40px] sm:min-h-[42px] px-3 sm:px-5 py-2 rounded-full border-2 border-black text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               isDirty
                 ? 'bg-[#12365c] text-white hover:bg-[#0e2b4b] brutal-shadow-xs'
                 : 'bg-white text-black hover:bg-neutral-100'
@@ -724,15 +608,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
             <span>{saving ? 'Saxlanır...' : isDirty ? 'Yadda Saxla*' : 'Yadda Saxla'}</span>
           </button>
 
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="min-h-[40px] sm:min-h-[42px] px-3 sm:px-4 py-2 rounded-full border-2 border-black bg-red-50 hover:bg-red-100 text-red-700 text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+          >
+            <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span>Çıxış</span>
+          </button>
+
           {/* 3 Parallel Horizontal Lines Menu Button (≡) */}
           <button
             type="button"
             onClick={openMenuDrawer}
             aria-label="Bölmələr menyusu"
             aria-expanded={isMenuOpen}
-            className="w-11 h-11 rounded-xl bg-neutral-100 hover:bg-neutral-200 border-2 border-black flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-neutral-100 hover:bg-neutral-200 border-2 border-black flex items-center justify-center transition-colors cursor-pointer shrink-0"
           >
-            <Menu className="w-6 h-6 text-black" strokeWidth={2.5} />
+            <Menu className="w-5 h-5 sm:w-6 sm:h-6 text-black" strokeWidth={2.5} />
           </button>
         </div>
       </header>
@@ -826,11 +719,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
 
               <button
                 type="button"
-                onClick={() => logout()}
+                onClick={handleLogout}
                 className="w-full min-h-[46px] px-4 py-2.5 bg-red-50 hover:bg-red-100 border-2 border-red-300 text-red-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
-                <span>Hesabdan Çıxış</span>
+                <span>Çıxış</span>
               </button>
             </div>
           </aside>
@@ -973,7 +866,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                     />
                   </div>
 
-                  {isPlatformAdminEmail(user.email, user.emailVerified) && (
+                  {isAdminAuthenticated && (
                     <label className="flex items-center gap-3 p-4 rounded-2xl bg-neutral-50 border border-black/15 cursor-pointer">
                       <input
                         type="checkbox"
@@ -1123,7 +1016,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                 </div>
 
                 <ImageUploadControl
-                  uid={user.uid}
+                  uid={user?.uid || 'admin-na-mexman'}
                   folder="avatar"
                   value={draft.heroImageUrl || ''}
                   label="Profil Fotosu Yüklə / Dəyiş"
@@ -1552,7 +1445,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                         </div>
 
                         <ImageUploadControl
-                          uid={user.uid}
+                          uid={user?.uid || 'admin-na-mexman'}
                           folder="news"
                           value={card.thumbnailUrl || ''}
                           label="Kart / Video Önizləmə Fotosu"
@@ -1675,7 +1568,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                         </div>
 
                         <ImageUploadControl
-                          uid={user.uid}
+                          uid={user?.uid || 'admin-na-mexman'}
                           folder="products"
                           value={prod.imageUrl || ''}
                           label="Məhsul Fotosu"
@@ -1844,16 +1737,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
               </div>
             )}
 
-            {/* 6. MUSIQI (MIKSTEYP) */}
+            {/* 6. ELMLƏ BAĞLI MÜHAZİRƏLƏRİM (PDF) */}
             {activeSection === 'musiqi' && (
               <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white border-2 border-black rounded-[24px] p-5 sm:p-6">
                   <div>
                     <h2 className="text-lg font-black text-black">
-                      Musiqi və Miksteyplər ({draft.music.length})
+                      Elmlə Bağlı Mühazirələrim ({draft.music.length})
                     </h2>
                     <p className="text-xs text-neutral-500 mt-1">
-                      Ana səhifədəki &quot;Qisaget-in Miksteypi&quot; bölməsini redaktə edin
+                      Ana səhifədəki &quot;Elmlə Bağlı Mühazirələrim&quot; PDF kartlarını redaktə edin
                     </p>
                   </div>
                   <button
@@ -1861,11 +1754,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                     onClick={() => {
                       const track: MixtapeTrack = {
                         id: `mix-${Date.now()}`,
-                        title: 'Yeni Miksteyp',
+                        title: `Mühazirə ${draft.music.length + 1} · PDF`,
                         artist: 'Na.Mexman',
                         gradient: 'linear-gradient(135deg,#12365c,#6ea6d8)',
-                        duration: '2:40',
-                        baseFrequency: 310,
+                        duration: 'PDF',
                       };
                       updateDraft((prev) => ({
                         ...prev,
@@ -1875,13 +1767,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                     className="min-h-[44px] px-5 py-2.5 bg-[#12365c] hover:bg-[#0d2a48] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shrink-0"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>Yeni Trek Əlavə Et</span>
+                    <span>Yeni Mühazirə Əlavə Et</span>
                   </button>
                 </div>
 
                 {draft.music.length === 0 ? (
                   <div className="bg-white border-2 border-black/20 rounded-[24px] p-10 text-center text-sm text-neutral-500">
-                    Hazırda miksteyp siyahısı boşdur. Trek əlavə edə bilərsiniz.
+                    Hazırda mühazirə siyahısı boşdur. PDF mühazirə əlavə edə bilərsiniz.
                   </div>
                 ) : (
                   <div className="space-y-6">
@@ -1912,7 +1804,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                           <div className="space-y-2">
                             <label className="block text-xs font-extrabold text-black">
-                              Trek Adı
+                              Mühazirənin Adı
                             </label>
                             <input
                               type="text"
@@ -1932,7 +1824,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
 
                           <div className="space-y-2">
                             <label className="block text-xs font-extrabold text-black">
-                              İfaçı
+                              Müəllif / Bölmə
                             </label>
                             <input
                               type="text"
@@ -1952,7 +1844,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
 
                           <div className="space-y-2">
                             <label className="block text-xs font-extrabold text-black">
-                              Müddət
+                              Format / Səhifə
                             </label>
                             <input
                               type="text"
@@ -1970,6 +1862,42 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                             />
                           </div>
                         </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-xs font-extrabold text-black">
+                            PDF Fayl Linki (URL)
+                          </label>
+                          <input
+                            type="url"
+                            placeholder="https://.../muhazire.pdf"
+                            value={track.pdfUrl || ''}
+                            onChange={(e) =>
+                              updateDraft((prev) => ({
+                                ...prev,
+                                music: prev.music.map((m) =>
+                                  m.id === track.id ? { ...m, pdfUrl: e.target.value } : m
+                                ),
+                              }))
+                            }
+                            className="w-full min-h-[44px] px-4 py-2 bg-neutral-50 border-2 border-black/20 focus:border-black rounded-xl text-sm font-medium focus:outline-none"
+                          />
+                        </div>
+
+                        <ImageUploadControl
+                          uid={user?.uid || 'admin-na-mexman'}
+                          folder="uploads"
+                          value={track.coverUrl || ''}
+                          label="Qapaq Fotosu (Cover)"
+                          previewAspect="square"
+                          onChange={(url) =>
+                            updateDraft((prev) => ({
+                              ...prev,
+                              music: prev.music.map((m) =>
+                                m.id === track.id ? { ...m, coverUrl: url } : m
+                              ),
+                            }))
+                          }
+                        />
                       </div>
                     ))}
                   </div>

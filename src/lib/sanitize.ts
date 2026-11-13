@@ -108,7 +108,7 @@ export function sanitizeUrl(raw: string, allowRelativeAsset = false): string {
 
   let candidate = trimmed;
   if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(candidate)) {
-    // Allow shorthand domains like drived.az -> https://drived.az
+    // Allow shorthand domains like qisaget.az -> https://qisaget.az
     if (candidate.includes('.') && !candidate.includes(' ')) {
       candidate = `https://${candidate}`;
     } else {

@@ -10,7 +10,7 @@ import {
 } from '../data/defaults';
 import { QLogo } from './QLogo';
 import { VerifiedBadge } from './VerifiedBadge';
-import { MixtapePlayer } from './MixtapePlayer';
+import { MixtapePlayer, resolveLectureTitle } from './MixtapePlayer';
 import { ShareModal } from './ShareModal';
 import { CardDetailModal, CardModalInfo } from './CardDetailModal';
 import { EmailCollectorModal } from './EmailCollectorModal';
@@ -429,14 +429,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     if (activeOverlay.kind === 'music') {
       const track = displayedMixtapes.find((t) => t.id === activeOverlay.id);
       if (!track) return null;
+      const safePdfUrl = track.pdfUrl ? sanitizeUrl(track.pdfUrl, true) : '';
+      const displayTitle = resolveLectureTitle(track.title);
       return {
-        title: track.title,
-        subtitle: `İfaçı: ${track.artist} · Müddət: ${track.duration}`,
-        description:
-          'Qisaget Yaradıcı Miksteyp seriyası: işləyərkən, dizayn edərkən və məzmun yaradarkən dinləmək üçün xüsusi lofi aranjeman.',
+        title: displayTitle,
+        subtitle: `Elmi Mühazirə · ${track.artist || 'Na.Mexman'} · ${track.duration || 'PDF'}`,
+        description: safePdfUrl
+          ? 'Elmlə bağlı elmi işlər və mühazirə materialları. PDF sənədini yeni pəncərədə açaraq oxuya və yükləyə bilərsiniz.'
+          : 'Elmlə bağlı elmi işlər və mühazirə materialları bölməsi. PDF sənədi əlavə edildikdə birbaşa açılacaq.',
         gradient: track.gradient,
-        points: ['Web Audio API ilə canlı sintez', 'Offline rejimdə işləyir', 'Fokus və yaradıcılıq üçün'],
-        actionLabel: 'Pleylisti dinlə',
+        points: ['Elmi mühazirə və tədqiqat materialı', 'PDF formatında oxu və yükləmə dəstəyi'],
+        actionLabel: safePdfUrl ? 'PDF-i Aç' : 'Bağla',
+        onAction: safePdfUrl
+          ? () => window.open(safePdfUrl, '_blank', 'noopener,noreferrer')
+          : undefined,
       };
     }
 
@@ -731,9 +737,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
             {/* News Row (Wide Cards) */}
             {displayedNews.length > 0 && (
-              <div className="flex gap-3 sm:gap-4 overflow-x-auto px-5 sm:px-7 pb-2.5 hide-scrollbar snap-x snap-mandatory">
+              <div className="flex gap-3 sm:gap-4 overflow-x-auto pl-5 sm:pl-7 scroll-px-5 sm:scroll-px-7 pb-2.5 hide-scrollbar snap-x snap-mandatory">
                 {displayedNews.map((card) => {
-                  const safeVideo = sanitizeUrl(card.videoUrl || '');
                   return (
                     <div
                       key={card.id}
@@ -771,6 +776,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     </div>
                   );
                 })}
+                <div className="flex-none w-2 sm:w-3 shrink-0" aria-hidden="true" />
               </div>
             )}
 
@@ -786,11 +792,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </section>
             )}
 
-            {/* SECTION: Qisaget-in Miksteypi 🎵 */}
+            {/* SECTION: Elmlə Bağlı Mühazirələrim */}
             {displayedMixtapes.length > 0 && (
               <section className="mt-6">
                 <h2 className={`text-center text-[15px] font-bold mb-3.5 ${primaryTextClass}`}>
-                  Qisaget-in Miksteypi 🎵
+                  Elmlə Bağlı Mühazirələrim
                 </h2>
                 <MixtapePlayer
                   tracks={displayedMixtapes}
@@ -800,16 +806,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             )}
 
             {/* SECTION: Qisaget Rəsmi Instagram Profili */}
-            <section className="mt-7">
+            <section className="mt-6">
               <a
                 href="https://www.instagram.com/qisaget.az/?utm_source=ig_web_button_share_sheet"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block bg-white border-2 border-black rounded-[28px] brutal-shadow p-6 mx-3.5 sm:mx-6 text-center hover:-translate-y-1 active:translate-y-0 transition-transform cursor-pointer group"
+                className="flex items-center gap-3.5 sm:gap-5 bg-white border-2 border-black rounded-[24px] brutal-shadow px-4 py-4 sm:px-6 sm:py-5 mx-4 sm:mx-7 hover:-translate-y-1 active:translate-y-0 transition-transform cursor-pointer group"
               >
-                <div className="w-20 h-20 mx-auto rounded-full bg-[#8ac2ff] border-2 border-black flex items-center justify-center brutal-shadow-xs group-hover:scale-105 transition-transform relative">
-                  <QLogo size={42} strokeWidth={9} className="text-black" />
-                  <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white border border-white shadow-xs">
+                <div className="w-[68px] h-[68px] sm:w-[76px] sm:h-[76px] rounded-full bg-[#8ac2ff] border-2 border-black flex items-center justify-center shrink-0 brutal-shadow-xs group-hover:scale-105 transition-transform relative">
+                  <QLogo size={36} strokeWidth={9} className="text-black" />
+                  <span className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white border border-white shadow-xs">
                     <svg className="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
                       <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
                       <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
@@ -818,23 +824,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   </span>
                 </div>
 
-                <div className="mt-3.5">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <h3 className="text-[19px] sm:text-[20px] font-black text-black tracking-tight">
-                      qisaget.az
-                    </h3>
-                  </div>
-                  <p className="text-[13px] font-semibold text-neutral-700 mt-0.5">
+                <div className="flex-1 min-w-0 text-center flex flex-col items-center">
+                  <h3 className="text-[18px] sm:text-[20px] font-black text-black tracking-tight leading-tight">
+                    qisaget.az
+                  </h3>
+                  <p className="text-[12px] sm:text-[13px] font-semibold text-neutral-700 mt-0.5 leading-snug">
                     QısaGet • Bütün Linklər Bir Arada
                   </p>
-                  <p className="text-[12px] text-neutral-500 mt-1 font-medium">
-                    🔥 Bütün hesabların bir toxunuşda · 🤫 Partlayış olacaq
-                  </p>
-                </div>
 
-                <div className="mt-4.5">
-                  <div className="w-full py-3.5 px-6 bg-black group-hover:bg-neutral-800 text-white rounded-full font-bold text-[15px] sm:text-[16px] flex items-center justify-center gap-2 brutal-shadow-xs transition-colors shadow-sm">
-                    <svg className="w-5 h-5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                  <div className="w-full mt-3 py-2.5 sm:py-3 px-4 bg-black group-hover:bg-neutral-800 text-white rounded-full font-bold text-[14px] sm:text-[15px] flex items-center justify-center gap-2 brutal-shadow-xs transition-colors shadow-sm">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5 fill-none stroke-current stroke-2 shrink-0" viewBox="0 0 24 24">
                       <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
                       <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
                       <circle cx="17.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"></circle>

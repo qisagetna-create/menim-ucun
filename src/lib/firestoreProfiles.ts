@@ -46,6 +46,33 @@ export function isPlatformAdminEmail(email?: string | null, emailVerified?: bool
   return Boolean(emailVerified && email && email.toLowerCase() === ADMIN_EMAIL);
 }
 
+const LOCAL_PROFILE_PREFIX = 'qisaget_local_profile_';
+
+export function getLocalProfileOverride(username: string): ProfileData | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(`${LOCAL_PROFILE_PREFIX}${username}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ProfileData;
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      ...parsed,
+      links: migrateLegacyNaMexmanLinks(Array.isArray(parsed.links) ? parsed.links : [], username),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function saveLocalProfileOverride(username: string, profile: ProfileData): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(`${LOCAL_PROFILE_PREFIX}${username}`, JSON.stringify(profile));
+  } catch {
+    // Storage quota exceeded or blocked
+  }
+}
+
 /**
  * Strips undefined values and enforces strict schema bounds matching firebase-blueprint.json
  */
@@ -100,11 +127,14 @@ export function buildFirestoreProfilePayload(
 
   const cleanMusic: MixtapeTrack[] = (profile.music || []).slice(0, 30).map((m, idx) => ({
     id: (m.id || `mix-${idx}`).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || `mix-${idx}`,
-    title: sanitizeText(m.title || 'Musiqi', 90),
-    artist: sanitizeText(m.artist || 'İfaçı', 60),
+    title: sanitizeText(m.title || 'Mühazirə', 90),
+    artist: sanitizeText(m.artist || 'Na.Mexman', 60),
     gradient: sanitizeText(m.gradient || 'linear-gradient(135deg,#a50c24,#f0b0c0)', 120),
-    duration: sanitizeText(m.duration || '2:30', 15),
+    duration: sanitizeText(m.duration || 'PDF', 15),
     baseFrequency: Number.isFinite(Number(m.baseFrequency)) ? Number(m.baseFrequency) : 330,
+    ...(m.coverUrl ? { coverUrl: sanitizeUrl(m.coverUrl, true) } : {}),
+    ...(m.audioUrl ? { audioUrl: sanitizeUrl(m.audioUrl, true) } : {}),
+    ...(m.pdfUrl ? { pdfUrl: sanitizeUrl(m.pdfUrl, true) } : {}),
   }));
 
   const cleanNews: NewsCard[] = (profile.news || []).slice(0, 20).map((n, idx) => ({
@@ -150,11 +180,72 @@ export function buildFirestoreProfilePayload(
   return base;
 }
 
+const LEGACY_LINK_URL_REPLACEMENTS: Array<{
+  id: string;
+  titleMatch: string;
+  oldUrls: string[];
+  nextUrl: string;
+}> = [
+  {
+    id: 'link-restoweb',
+    titleMatch: 'restoweb',
+    oldUrls: ['https://restoweb.az', 'http://restoweb.az'],
+    nextUrl: 'https://ais-dev-mwf5gth5honsybz35zye6k-196080740499.europe-west3.run.app/',
+  },
+  {
+    id: 'link-caliper',
+    titleMatch: 'caliper',
+    oldUrls: ['https://caliper.az', 'http://caliper.az'],
+    nextUrl:
+      'https://caliper-store.vercel.app/?utm_source=ig&utm_medium=social&utm_content=link_in_bio&fbclid=PAZXh0bgNhZW0CMTEAcGRvZgJzcnRjBmFwcF9pZA85MzY2MTk3NDMzOTI0NTkAAaflDtuQUvMbPKIKGgoC5f-jl8xHVYxtUWUHp5ZnCiH2WCnKRBuT-4MZx2czJw_aem_-IHXUdTiIurG6yYjeSrBHA',
+  },
+  {
+    id: 'link-github',
+    titleMatch: 'github',
+    oldUrls: ['https://github.com/namexman', 'http://github.com/namexman'],
+    nextUrl: 'https://github.com/qisagetna-create',
+  },
+];
+
+function stripTrailingSlash(url: string): string {
+  return (url || '').trim().replace(/\/+$/, '').toLowerCase();
+}
+
+function migrateLegacyNaMexmanLinks(links: CustomLink[], username: string): CustomLink[] {
+  if (username !== 'na.mexman') return links;
+  return links
+    .filter((l) => {
+      const cleanUrl = stripTrailingSlash(l.url || '');
+      const cleanTitle = (l.title || '').trim().toLowerCase();
+      return !(
+        l.id === 'link-drived' ||
+        cleanTitle === 'drived' ||
+        cleanUrl === 'https://drived.az' ||
+        cleanUrl === 'http://drived.az'
+      );
+    })
+    .map((l) => {
+      const cleanUrl = stripTrailingSlash(l.url || '');
+      const cleanTitle = (l.title || '').trim().toLowerCase();
+      const rule = LEGACY_LINK_URL_REPLACEMENTS.find(
+        (r) =>
+          (l.id === r.id || cleanTitle.includes(r.titleMatch)) &&
+          r.oldUrls.includes(cleanUrl)
+      );
+      if (rule) {
+        return { ...l, url: rule.nextUrl };
+      }
+      return l;
+    });
+}
+
 export function mapFirestoreDocToProfile(docData: Record<string, unknown>, docId: string): ProfileData {
   const socialsRaw = (docData.socials || {}) as Partial<SocialLinks>;
+  const username = String(docData.username || docId);
+  const rawLinks = Array.isArray(docData.links) ? (docData.links as CustomLink[]) : [];
   return {
     ownerUid: String(docData.ownerUid || ''),
-    username: String(docData.username || docId),
+    username,
     displayName: String(docData.name || docId),
     bio: String(docData.bio || ''),
     isVerified: Boolean(docData.verified),
@@ -170,7 +261,7 @@ export function mapFirestoreDocToProfile(docData: Record<string, unknown>, docId
       linkedin: socialsRaw.linkedin || '',
       discord: socialsRaw.discord || '',
     },
-    links: Array.isArray(docData.links) ? (docData.links as CustomLink[]) : [],
+    links: migrateLegacyNaMexmanLinks(rawLinks, username),
     products: Array.isArray(docData.products) ? (docData.products as ProductItem[]) : [],
     music: Array.isArray(docData.music) ? (docData.music as MixtapeTrack[]) : [],
     news: Array.isArray(docData.news) ? (docData.news as NewsCard[]) : [],

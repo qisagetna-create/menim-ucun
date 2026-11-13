@@ -41,7 +41,10 @@ export interface MixtapeTrack {
   artist: string;
   gradient: string;
   duration: string;
-  baseFrequency: number;
+  baseFrequency?: number;
+  coverUrl?: string;
+  audioUrl?: string;
+  pdfUrl?: string;
 }
 
 export interface NewsCard {
