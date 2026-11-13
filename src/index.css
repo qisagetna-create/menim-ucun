@@ -60,3 +60,55 @@ body {
   animation: blink 6s infinite;
   transform-origin: center;
 }
+
+/* Qisaget startup logo animation (4.4s cycle: hold -> retract -> clockwise draw out) */
+@keyframes qlogo-ray-0 {
+  0%, 4% { stroke-dashoffset: 0; }
+  17%, 20% { stroke-dashoffset: 100; }
+  31%, 100% { stroke-dashoffset: 0; }
+}
+@keyframes qlogo-ray-1 {
+  0%, 4% { stroke-dashoffset: 0; }
+  17%, 27% { stroke-dashoffset: 100; }
+  38%, 100% { stroke-dashoffset: 0; }
+}
+@keyframes qlogo-ray-2 {
+  0%, 4% { stroke-dashoffset: 0; }
+  17%, 34% { stroke-dashoffset: 100; }
+  45%, 100% { stroke-dashoffset: 0; }
+}
+@keyframes qlogo-ray-3 {
+  0%, 4% { stroke-dashoffset: 0; }
+  17%, 41% { stroke-dashoffset: 100; }
+  52%, 100% { stroke-dashoffset: 0; }
+}
+@keyframes qlogo-ray-4 {
+  0%, 4% { stroke-dashoffset: 0; }
+  17%, 48% { stroke-dashoffset: 100; }
+  59%, 100% { stroke-dashoffset: 0; }
+}
+@keyframes qlogo-ray-5 {
+  0%, 4% { stroke-dashoffset: 0; }
+  17%, 55% { stroke-dashoffset: 100; }
+  66%, 100% { stroke-dashoffset: 0; }
+}
+@keyframes qlogo-ray-6 {
+  0%, 4% { stroke-dashoffset: 0; }
+  17%, 62% { stroke-dashoffset: 100; }
+  73%, 100% { stroke-dashoffset: 0; }
+}
+@keyframes qlogo-ray-7 {
+  0%, 4% { stroke-dashoffset: 0; }
+  17%, 69% { stroke-dashoffset: 100; }
+  82%, 100% { stroke-dashoffset: 0; }
+}
+
+.qlogo-ray-0 { stroke-dasharray: 100 100; animation: qlogo-ray-0 4.4s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+.qlogo-ray-1 { stroke-dasharray: 100 100; animation: qlogo-ray-1 4.4s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+.qlogo-ray-2 { stroke-dasharray: 100 100; animation: qlogo-ray-2 4.4s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+.qlogo-ray-3 { stroke-dasharray: 100 100; animation: qlogo-ray-3 4.4s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+.qlogo-ray-4 { stroke-dasharray: 100 100; animation: qlogo-ray-4 4.4s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+.qlogo-ray-5 { stroke-dasharray: 100 100; animation: qlogo-ray-5 4.4s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+.qlogo-ray-6 { stroke-dasharray: 100 100; animation: qlogo-ray-6 4.4s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+.qlogo-ray-7 { stroke-dasharray: 100 100; animation: qlogo-ray-7 4.4s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+

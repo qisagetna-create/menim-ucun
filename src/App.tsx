@@ -4,7 +4,6 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import {
   createNaMexmanTemplateProfile,
@@ -28,6 +27,7 @@ import { LandingView } from './components/LandingView';
 import { LegalPages } from './components/LegalPages';
 import { NotFoundView } from './components/NotFoundView';
 import { AdminPanel } from './components/AdminPanel';
+import { SplashLoader } from './components/SplashLoader';
 
 type RouteState =
   | { kind: 'root' }
@@ -67,6 +67,15 @@ export default function App() {
     initNavigation();
     return parseRoute(window.location.pathname);
   });
+
+  const [splashDone, setSplashDone] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSplashDone(true);
+    }, 4400);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const [profileState, setProfileState] = useState<{
     status: 'idle' | 'loading' | 'loaded' | 'notfound' | 'error';
@@ -198,16 +207,9 @@ export default function App() {
     return <NotFoundView requestedSlug={route.slug} onNavigate={navigate} />;
   }
 
-  // Root (/) or Public Profile (/{username})
-  if (profileState.status === 'loading' || profileState.status === 'idle') {
-    return (
-      <div className="min-h-screen bg-[#6ea6d8] flex items-center justify-center p-4">
-        <div className="bg-white border-2 border-black rounded-[28px] brutal-shadow p-8 text-center space-y-3">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#12365c]" />
-          <p className="text-sm font-bold text-black">Profil yüklənir...</p>
-        </div>
-      </div>
-    );
+  // Initial startup splash (4.4s light-green Qisaget logo animation) + loading fallback
+  if (!splashDone || profileState.status === 'loading' || profileState.status === 'idle') {
+    return <SplashLoader />;
   }
 
   if (profileState.status === 'error') {
