@@ -57,6 +57,7 @@ export function getLocalProfileOverride(username: string): ProfileData | null {
     if (!parsed || typeof parsed !== 'object') return null;
     return {
       ...parsed,
+      socials: migrateLegacyNaMexmanSocials(parsed.socials || {}, username),
       links: migrateLegacyNaMexmanLinks(Array.isArray(parsed.links) ? parsed.links : [], username),
     };
   } catch {
@@ -239,6 +240,31 @@ function migrateLegacyNaMexmanLinks(links: CustomLink[], username: string): Cust
     });
 }
 
+function migrateLegacyNaMexmanSocials(
+  socialsRaw: Partial<SocialLinks>,
+  username: string
+): SocialLinks {
+  const clearIfLegacy = (url: string | undefined, legacyValues: string[]): string => {
+    const raw = (url || '').trim();
+    if (!raw) return '';
+    if (username === 'na.mexman' && legacyValues.includes(stripTrailingSlash(raw))) {
+      return '';
+    }
+    return raw;
+  };
+
+  return {
+    instagram: (socialsRaw.instagram || '').trim(),
+    whatsapp: (socialsRaw.whatsapp || '').trim(),
+    tiktok: clearIfLegacy(socialsRaw.tiktok, ['https://tiktok.com/@na.mexman', 'http://tiktok.com/@na.mexman']),
+    telegram: (socialsRaw.telegram || '').trim(),
+    youtube: clearIfLegacy(socialsRaw.youtube, ['https://youtube.com/@qisaget', 'http://youtube.com/@qisaget']),
+    facebook: clearIfLegacy(socialsRaw.facebook, ['https://facebook.com/na.mexman', 'http://facebook.com/na.mexman']),
+    linkedin: clearIfLegacy(socialsRaw.linkedin, ['https://linkedin.com/in/na-mexman', 'http://linkedin.com/in/na-mexman']),
+    discord: clearIfLegacy(socialsRaw.discord, ['https://discord.gg/qisaget', 'http://discord.gg/qisaget']),
+  };
+}
+
 export function mapFirestoreDocToProfile(docData: Record<string, unknown>, docId: string): ProfileData {
   const socialsRaw = (docData.socials || {}) as Partial<SocialLinks>;
   const username = String(docData.username || docId);
@@ -251,16 +277,7 @@ export function mapFirestoreDocToProfile(docData: Record<string, unknown>, docId
     isVerified: Boolean(docData.verified),
     themeId: VALID_THEMES.has(String(docData.theme || '')) ? String(docData.theme) : 'classic-blue',
     wa: String(docData.wa || ''),
-    socials: {
-      instagram: socialsRaw.instagram || '',
-      whatsapp: socialsRaw.whatsapp || '',
-      tiktok: socialsRaw.tiktok || '',
-      telegram: socialsRaw.telegram || '',
-      youtube: socialsRaw.youtube || '',
-      facebook: socialsRaw.facebook || '',
-      linkedin: socialsRaw.linkedin || '',
-      discord: socialsRaw.discord || '',
-    },
+    socials: migrateLegacyNaMexmanSocials(socialsRaw, username),
     links: migrateLegacyNaMexmanLinks(rawLinks, username),
     products: Array.isArray(docData.products) ? (docData.products as ProductItem[]) : [],
     music: Array.isArray(docData.music) ? (docData.music as MixtapeTrack[]) : [],

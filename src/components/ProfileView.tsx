@@ -45,7 +45,8 @@ type ProfileOverlayState =
   | { kind: 'about' }
   | { kind: 'share'; subTab: 'share' | 'qr' }
   | { kind: 'cart' }
-  | { kind: 'email' };
+  | { kind: 'email' }
+  | { kind: 'social'; id: 'instagram' | 'whatsapp' | 'facebook' | 'linkedin' };
 
 interface ProfileRouteViewState {
   tab: ProfileTab;
@@ -76,6 +77,16 @@ function parseProfileSearch(search: string): ProfileRouteViewState {
   const musiqiId = params.get('musiqi');
   if (musiqiId) {
     return { tab, overlay: { kind: 'music', id: musiqiId } };
+  }
+
+  const sosialId = params.get('sosial');
+  if (
+    sosialId === 'instagram' ||
+    sosialId === 'whatsapp' ||
+    sosialId === 'facebook' ||
+    sosialId === 'linkedin'
+  ) {
+    return { tab, overlay: { kind: 'social', id: sosialId } };
   }
 
   const pencere = params.get('pencere');
@@ -140,6 +151,9 @@ function buildProfileUrl(
         break;
       case 'email':
         params.set('pencere', 'abune');
+        break;
+      case 'social':
+        params.set('sosial', overlay.id);
         break;
     }
   }
@@ -292,9 +306,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     (sanitizeWhatsappNumber(profileData.wa) ? `https://wa.me/${sanitizeWhatsappNumber(profileData.wa)}` : '');
 
   const instagramHref = sanitizeUrl(profileData.socials?.instagram || '');
-  const tiktokHref = sanitizeUrl(profileData.socials?.tiktok || '');
-  const telegramHref = sanitizeUrl(profileData.socials?.telegram || '');
-  const youtubeHref = sanitizeUrl(profileData.socials?.youtube || '');
   const facebookHref = sanitizeUrl(profileData.socials?.facebook || '');
   const linkedinHref = sanitizeUrl(profileData.socials?.linkedin || '');
 
@@ -446,6 +457,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       };
     }
 
+    if (activeOverlay.kind === 'social') {
+      const labelMap: Record<'instagram' | 'whatsapp' | 'facebook' | 'linkedin', string> = {
+        instagram: 'Instagram',
+        whatsapp: 'WhatsApp',
+        facebook: 'Facebook',
+        linkedin: 'LinkedIn',
+      };
+      const label = labelMap[activeOverlay.id];
+      return {
+        title: `${label} Hesabı`,
+        subtitle: 'Sosial Şəbəkə',
+        description: `${label} hesabımız və ya rəsmi linki hələlik aktiv deyil. Link əlavə edildikdə birbaşa açılacaq.`,
+        actionLabel: 'Bağla',
+      };
+    }
+
     return null;
   }, [activeOverlay, displayedMixtapes, displayedNews, displayedProducts, instagramHref, profileData.displayName, profileData.links, profileData.wa]);
 
@@ -520,9 +547,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </p>
           )}
 
-          {/* Social Icons Row */}
+          {/* Social Icons Row (Only 4 icons: Instagram, WhatsApp, Facebook, LinkedIn) */}
           <div className={`flex flex-wrap justify-center items-center gap-5 sm:gap-6 my-4 ${primaryTextClass}`}>
-            {instagramHref && (
+            {instagramHref ? (
               <a
                 href={instagramHref}
                 target="_blank"
@@ -537,9 +564,24 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
                 </svg>
               </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => !isPreview && openOverlay({ kind: 'social', id: 'instagram' })}
+                className="hover:scale-115 transition-all p-1.5 cursor-pointer"
+                aria-label="Instagram"
+                title="Instagram linki hələ əlavə edilməyib"
+              >
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <title>Instagram</title>
+                  <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                  <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+                </svg>
+              </button>
             )}
 
-            {whatsappDirectHref && (
+            {whatsappDirectHref ? (
               <a
                 href={whatsappDirectHref}
                 target="_blank"
@@ -552,54 +594,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
                 </svg>
               </a>
-            )}
-
-            {tiktokHref && (
-              <a
-                href={tiktokHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:scale-115 transition-all p-1.5"
-                aria-label="TikTok"
+            ) : (
+              <button
+                type="button"
+                onClick={() => !isPreview && openOverlay({ kind: 'social', id: 'whatsapp' })}
+                className="hover:scale-115 transition-all p-1.5 cursor-pointer"
+                aria-label="WhatsApp"
+                title="WhatsApp linki hələ əlavə edilməyib"
               >
                 <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                  <title>TikTok</title>
-                  <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.89 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1v-3.53a6.37 6.37 0 0 0-.79-.05A6.34 6.34 0 0 0 3 15.67 6.34 6.34 0 0 0 9.34 22a6.34 6.34 0 0 0 6.34-6.33V9.08a8.28 8.28 0 0 0 4.91 1.6v-3.45a4.85 4.85 0 0 1-1-.54z" />
+                  <title>WhatsApp</title>
+                  <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
                 </svg>
-              </a>
+              </button>
             )}
 
-            {telegramHref && (
-              <a
-                href={telegramHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:scale-115 transition-all p-1.5"
-                aria-label="Telegram"
-              >
-                <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                  <title>Telegram</title>
-                  <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z" />
-                </svg>
-              </a>
-            )}
-
-            {youtubeHref && (
-              <a
-                href={youtubeHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:scale-115 transition-all p-1.5"
-                aria-label="YouTube"
-              >
-                <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-                  <title>YouTube</title>
-                  <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                </svg>
-              </a>
-            )}
-
-            {facebookHref && (
+            {facebookHref ? (
               <a
                 href={facebookHref}
                 target="_blank"
@@ -612,9 +622,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                 </svg>
               </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => !isPreview && openOverlay({ kind: 'social', id: 'facebook' })}
+                className="hover:scale-115 transition-all p-1.5 cursor-pointer"
+                aria-label="Facebook"
+                title="Facebook linki hələ əlavə edilməyib"
+              >
+                <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                  <title>Facebook</title>
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+                </svg>
+              </button>
             )}
 
-            {linkedinHref && (
+            {linkedinHref ? (
               <a
                 href={linkedinHref}
                 target="_blank"
@@ -627,6 +650,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z" />
                 </svg>
               </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => !isPreview && openOverlay({ kind: 'social', id: 'linkedin' })}
+                className="hover:scale-115 transition-all p-1.5 cursor-pointer"
+                aria-label="LinkedIn"
+                title="LinkedIn linki hələ əlavə edilməyib"
+              >
+                <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                  <title>LinkedIn</title>
+                  <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z" />
+                </svg>
+              </button>
             )}
           </div>
         </div>

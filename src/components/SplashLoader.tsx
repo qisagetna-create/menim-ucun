@@ -8,9 +8,13 @@ export const SplashLoader: React.FC = () => {
       aria-label="Yüklənir"
     >
       <div className="flex items-center justify-center gap-3.5 sm:gap-4">
+        <span className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-none">
+          Qısaget
+        </span>
+
         <svg
           viewBox="0 0 100 100"
-          className="w-12 h-12 sm:w-16 sm:h-16 text-[#4ade80] shrink-0 drop-shadow-[0_1px_1px_rgba(0,0,0,0.2)]"
+          className="w-16 h-16 sm:w-20 sm:h-20 text-[#4ade80] shrink-0 drop-shadow-[0_1px_1px_rgba(0,0,0,0.2)]"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
@@ -34,10 +38,6 @@ export const SplashLoader: React.FC = () => {
             />
           </g>
         </svg>
-
-        <span className="text-3xl sm:text-5xl font-black tracking-tight text-black leading-none">
-          Qısaget
-        </span>
       </div>
     </div>
   );

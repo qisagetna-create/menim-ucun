@@ -936,7 +936,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                     <div>
                       <h2 className="text-lg font-black text-black">Sosial Şəbəkə Hesabları</h2>
                       <p className="text-xs text-neutral-500 mt-0.5">
-                        Boş qoyulan hesablar profil səhifəsində gizlədilir
+                        Instagram və WhatsApp aktiv linkləri əsas səhifədə açılır; Facebook və LinkedIn boş olsa da 4 ikon sırada saxlanılır
                       </p>
                     </div>
                   </div>
@@ -946,11 +946,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                       [
                         ['instagram', 'Instagram URL'],
                         ['whatsapp', 'WhatsApp Birbaşa Link'],
-                        ['tiktok', 'TikTok URL'],
-                        ['telegram', 'Telegram URL'],
-                        ['youtube', 'YouTube URL'],
-                        ['facebook', 'Facebook URL'],
-                        ['linkedin', 'LinkedIn URL'],
+                        ['facebook', 'Facebook URL (link hələ yoxdursa boş saxlayın)'],
+                        ['linkedin', 'LinkedIn URL (link hələ yoxdursa boş saxlayın)'],
                       ] as const
                     ).map(([key, label]) => (
                       <div key={key} className="space-y-2">

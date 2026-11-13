@@ -128,12 +128,12 @@ export const INITIAL_PROFILE: ProfileData = {
   socials: {
     instagram: 'https://www.instagram.com/qisaget.az/?utm_source=ig_web_button_share_sheet',
     whatsapp: 'https://wa.me/994500000000',
-    tiktok: 'https://tiktok.com/@na.mexman',
+    tiktok: '',
     telegram: '',
-    youtube: 'https://youtube.com/@qisaget',
-    facebook: 'https://facebook.com/na.mexman',
-    linkedin: 'https://linkedin.com/in/na-mexman',
-    discord: 'https://discord.gg/qisaget',
+    youtube: '',
+    facebook: '',
+    linkedin: '',
+    discord: '',
   },
   links: [
     {
