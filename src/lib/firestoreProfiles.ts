@@ -397,13 +397,22 @@ export async function claimUsernameAndCreateProfile(params: {
   });
 
   const batch = writeBatch(db);
-  batch.set(doc(db, 'users', params.uid), {
-    uid: params.uid,
-    username: normalized,
-    email: sanitizeText(params.email || 'user@qisaget.az', 254),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  const existingUserSnap = await getDoc(doc(db, 'users', params.uid));
+  if (existingUserSnap.exists()) {
+    batch.update(doc(db, 'users', params.uid), {
+      username: normalized,
+      email: sanitizeText(params.email || 'user@qisaget.az', 254),
+      updatedAt: serverTimestamp(),
+    });
+  } else {
+    batch.set(doc(db, 'users', params.uid), {
+      uid: params.uid,
+      username: normalized,
+      email: sanitizeText(params.email || 'user@qisaget.az', 254),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  }
   batch.set(doc(db, 'profiles', normalized), profilePayload);
 
   try {
@@ -460,35 +469,50 @@ export async function saveProfileChanges(
   ownerUid: string,
   profile: ProfileData
 ): Promise<void> {
-  const allowVerified = isPlatformAdminEmail(auth.currentUser?.email, auth.currentUser?.emailVerified);
-  const fullPayload = buildFirestoreProfilePayload(profile, ownerUid, username, {
-    isCreate: false,
-    allowVerifiedEdit: allowVerified,
-  });
-
-  const updatePayload: Record<string, unknown> = {
-    name: fullPayload.name,
-    bio: fullPayload.bio,
-    avatar: fullPayload.avatar,
-    avatarOffsetY: fullPayload.avatarOffsetY,
-    avatarScale: fullPayload.avatarScale,
-    theme: fullPayload.theme,
-    socials: fullPayload.socials,
-    links: fullPayload.links,
-    products: fullPayload.products,
-    music: fullPayload.music,
-    news: fullPayload.news,
-    wa: fullPayload.wa,
-    updatedAt: serverTimestamp(),
-  };
-
-  if (allowVerified) {
-    updatePayload.verified = Boolean(profile.isVerified);
-  }
-
   const path = `profiles/${username}`;
+  const docRef = doc(db, 'profiles', username);
+
   try {
-    await updateDoc(doc(db, 'profiles', username), updatePayload);
+    const existingSnap = await getDoc(docRef);
+    if (!existingSnap.exists()) {
+      const currentUid = auth.currentUser?.uid || ownerUid;
+      const currentEmail = auth.currentUser?.email || 'qisaget.na@gmail.com';
+      await claimUsernameAndCreateProfile({
+        uid: currentUid,
+        email: currentEmail,
+        username,
+        profile,
+      });
+      return;
+    }
+
+    const allowVerified = isPlatformAdminEmail(auth.currentUser?.email, auth.currentUser?.emailVerified);
+    const fullPayload = buildFirestoreProfilePayload(profile, ownerUid, username, {
+      isCreate: false,
+      allowVerifiedEdit: allowVerified,
+    });
+
+    const updatePayload: Record<string, unknown> = {
+      name: fullPayload.name,
+      bio: fullPayload.bio,
+      avatar: fullPayload.avatar,
+      avatarOffsetY: fullPayload.avatarOffsetY,
+      avatarScale: fullPayload.avatarScale,
+      theme: fullPayload.theme,
+      socials: fullPayload.socials,
+      links: fullPayload.links,
+      products: fullPayload.products,
+      music: fullPayload.music,
+      news: fullPayload.news,
+      wa: fullPayload.wa,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (allowVerified) {
+      updatePayload.verified = Boolean(profile.isVerified);
+    }
+
+    await updateDoc(docRef, updatePayload);
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
   }

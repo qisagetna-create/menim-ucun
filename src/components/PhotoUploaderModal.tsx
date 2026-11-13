@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { copyImageUrlToStorage, uploadImageFileToStorage } from '../lib/storage';
 import { useAuth } from '../contexts/AuthContext';
+import { useBodyScrollLock } from '../lib/useBodyScrollLock';
 
 interface PhotoUploaderModalProps {
   isOpen: boolean;
@@ -23,6 +24,8 @@ interface PhotoUploaderModalProps {
   currentOffsetY?: number;
   currentScale?: number;
   displayName?: string;
+  activeTab?: 'upload' | 'camera' | 'url';
+  onTabChange?: (tab: 'upload' | 'camera' | 'url') => void;
   onSavePhotoSettings: (data: {
     imageUrl: string;
     offsetY: number;
@@ -37,6 +40,8 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
   currentOffsetY = 20,
   currentScale = 1.08,
   displayName = 'Profil',
+  activeTab: controlledTab,
+  onTabChange,
   onSavePhotoSettings,
 }) => {
   const { user } = useAuth();
@@ -44,13 +49,25 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
   const [previewUrl, setPreviewUrl] = useState(currentImageUrl);
   const [offsetY, setOffsetY] = useState(currentOffsetY);
   const [scale, setScale] = useState(currentScale);
-  const [activeTab, setActiveTab] = useState<'upload' | 'camera' | 'url'>('upload');
+  const [internalTab, setInternalTab] = useState<'upload' | 'camera' | 'url'>('upload');
+  const activeTab = controlledTab ?? internalTab;
+
+  const setActiveTab = (next: 'upload' | 'camera' | 'url') => {
+    if (onTabChange) {
+      onTabChange(next);
+    } else {
+      setInternalTab(next);
+    }
+  };
+
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const isDraggingRef = useRef(false);
   const startYRef = useRef(0);
   const startOffsetRef = useRef(offsetY);
+
+  useBodyScrollLock(isOpen);
 
   useEffect(() => {
     if (isOpen) {
@@ -62,6 +79,18 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
       setUploadProgress(null);
     }
   }, [isOpen, currentImageUrl, currentOffsetY, currentScale]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -167,14 +196,17 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overscroll-none animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-white border-2 border-black rounded-[28px] brutal-shadow p-5 sm:p-6 relative my-auto"
+        data-scroll-container="true"
+        className="w-full max-w-lg bg-white border-2 border-black rounded-[28px] brutal-shadow p-5 sm:p-6 relative max-h-[92vh] overflow-y-auto overscroll-contain modal-scrollable-content"
+        style={{ overscrollBehavior: 'contain' }}
         onClick={(e) => e.stopPropagation()}
       >
         <button
+          type="button"
           onClick={onClose}
           className="absolute top-4 right-4 w-9 h-9 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center border border-black/20 transition-colors cursor-pointer"
           aria-label="Bağla"
@@ -325,7 +357,8 @@ export const PhotoUploaderModal: React.FC<PhotoUploaderModalProps> = ({
             </div>
 
             <div
-              className="w-full h-44 rounded-2xl bg-[#a5d1f8] relative overflow-hidden border-2 border-black cursor-grab active:cursor-grabbing select-none"
+              data-touch-drag="true"
+              className="w-full h-44 rounded-2xl bg-[#a5d1f8] relative overflow-hidden border-2 border-black cursor-grab active:cursor-grabbing select-none touch-none"
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}

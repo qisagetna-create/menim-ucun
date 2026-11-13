@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, ShoppingBag, Trash2, ArrowRight, CheckCircle2, Tag } from 'lucide-react';
 import { ProductItem } from '../types';
+import { useBodyScrollLock } from '../lib/useBodyScrollLock';
 
 export interface CartItem {
   product: ProductItem;
@@ -29,6 +30,20 @@ export const CartModal: React.FC<CartModalProps> = ({
   const [promoMessage, setPromoMessage] = useState('');
   const [orderComplete, setOrderComplete] = useState(false);
   const [customerEmail, setCustomerEmail] = useState('');
+
+  useBodyScrollLock(isOpen);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -63,16 +78,17 @@ export const CartModal: React.FC<CartModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overscroll-none animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-white border-2 border-black rounded-[28px] brutal-shadow p-6 max-h-[90vh] flex flex-col relative"
+        className="w-full max-w-md bg-white border-2 border-black rounded-[28px] brutal-shadow p-6 max-h-[90vh] flex flex-col relative overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center border border-black/20 transition-colors"
+          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center border border-black/20 transition-colors cursor-pointer"
           aria-label="Bağla"
         >
           <X className="w-5 h-5 text-black" />
@@ -124,7 +140,11 @@ export const CartModal: React.FC<CartModalProps> = ({
         ) : (
           <div className="flex-1 flex flex-col min-h-0 space-y-4">
             {/* Items list */}
-            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+            <div
+              data-scroll-container="true"
+              className="flex-1 overflow-y-auto overscroll-contain space-y-2.5 pr-1 modal-scrollable-content"
+              style={{ overscrollBehavior: 'contain' }}
+            >
               {cart.map(({ product, quantity }) => (
                 <div
                   key={product.id}

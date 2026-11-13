@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Camera } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ProfileData } from '../types';
 import {
   THEME_OPTIONS,
   FEATURED_LINKERS,
+  NEWS_CARDS,
   QISAGET_ABOUT_SECTIONS,
   QISAGET_PRIVACY_SECTIONS,
   QISAGET_TERMS_SECTIONS,
@@ -14,17 +14,138 @@ import { MixtapePlayer } from './MixtapePlayer';
 import { ShareModal } from './ShareModal';
 import { CardDetailModal, CardModalInfo } from './CardDetailModal';
 import { EmailCollectorModal } from './EmailCollectorModal';
-import { DesignStudioModal } from './DesignStudioModal';
 import { CartModal, CartItem } from './CartModal';
-import { PhotoUploaderModal } from './PhotoUploaderModal';
 import { buildWhatsappOrderUrl, sanitizeUrl, sanitizeWhatsappNumber } from '../lib/sanitize';
+import {
+  getSavedSectionScroll,
+  goBackOrReplace,
+  pushAppUrl,
+  replaceAppUrl,
+  restoreScrollY,
+  saveSectionScroll,
+  subscribeToNavigation,
+} from '../lib/navigation';
+import { isBodyScrollLocked } from '../lib/useBodyScrollLock';
 
 interface ProfileViewProps {
   profileData: ProfileData;
-  onUpdateProfile?: (data: ProfileData) => void;
   onNavigate?: (path: string) => void;
-  isOwner?: boolean;
   isPreview?: boolean;
+}
+
+type ProfileTab = 'home' | 'shop';
+
+type ProfileOverlayState =
+  | { kind: 'product'; id: string }
+  | { kind: 'link'; id: string }
+  | { kind: 'card'; id: string }
+  | { kind: 'music'; id: string }
+  | { kind: 'privacy' }
+  | { kind: 'terms' }
+  | { kind: 'about' }
+  | { kind: 'share'; subTab: 'share' | 'qr' }
+  | { kind: 'cart' }
+  | { kind: 'email' };
+
+interface ProfileRouteViewState {
+  tab: ProfileTab;
+  overlay: ProfileOverlayState | null;
+}
+
+function parseProfileSearch(search: string): ProfileRouteViewState {
+  const params = new URLSearchParams(search);
+  const bolme = params.get('bolme');
+  const tab: ProfileTab = bolme === 'magaza' ? 'shop' : 'home';
+  const alt = params.get('alt');
+
+  const mehsulId = params.get('mehsul');
+  if (mehsulId) {
+    return { tab, overlay: { kind: 'product', id: mehsulId } };
+  }
+
+  const linkId = params.get('link');
+  if (linkId) {
+    return { tab, overlay: { kind: 'link', id: linkId } };
+  }
+
+  const kartId = params.get('kart');
+  if (kartId) {
+    return { tab, overlay: { kind: 'card', id: kartId } };
+  }
+
+  const musiqiId = params.get('musiqi');
+  if (musiqiId) {
+    return { tab, overlay: { kind: 'music', id: musiqiId } };
+  }
+
+  const pencere = params.get('pencere');
+  switch (pencere) {
+    case 'mexfilik':
+      return { tab, overlay: { kind: 'privacy' } };
+    case 'sertler':
+      return { tab, overlay: { kind: 'terms' } };
+    case 'qisaget-haqqinda':
+      return { tab, overlay: { kind: 'about' } };
+    case 'paylas':
+      return { tab, overlay: { kind: 'share', subTab: alt === 'qr' ? 'qr' : 'share' } };
+    case 'sebet':
+      return { tab, overlay: { kind: 'cart' } };
+    case 'abune':
+      return { tab, overlay: { kind: 'email' } };
+    default:
+      return { tab, overlay: null };
+  }
+}
+
+function buildProfileUrl(
+  pathname: string,
+  tab: ProfileTab,
+  overlay: ProfileOverlayState | null
+): string {
+  const cleanPath = pathname || '/';
+  const params = new URLSearchParams();
+  if (tab === 'shop') {
+    params.set('bolme', 'magaza');
+  }
+
+  if (overlay) {
+    switch (overlay.kind) {
+      case 'product':
+        params.set('mehsul', overlay.id);
+        break;
+      case 'link':
+        params.set('link', overlay.id);
+        break;
+      case 'card':
+        params.set('kart', overlay.id);
+        break;
+      case 'music':
+        params.set('musiqi', overlay.id);
+        break;
+      case 'privacy':
+        params.set('pencere', 'mexfilik');
+        break;
+      case 'terms':
+        params.set('pencere', 'sertler');
+        break;
+      case 'about':
+        params.set('pencere', 'qisaget-haqqinda');
+        break;
+      case 'share':
+        params.set('pencere', 'paylas');
+        if (overlay.subTab === 'qr') params.set('alt', 'qr');
+        break;
+      case 'cart':
+        params.set('pencere', 'sebet');
+        break;
+      case 'email':
+        params.set('pencere', 'abune');
+        break;
+    }
+  }
+
+  const query = params.toString();
+  return query ? `${cleanPath}?${query}` : cleanPath;
 }
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -38,20 +159,108 @@ function hexToRgba(hex: string, alpha: number): string {
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
   profileData,
-  onUpdateProfile,
   onNavigate,
-  isOwner = false,
   isPreview = false,
 }) => {
-  const [activeTab, setActiveTab] = useState<'home' | 'shop'>('home');
+  // Preview mode keeps isolated local state; live mode syncs 1:1 with Browser History API
+  const [previewState, setPreviewState] = useState<ProfileRouteViewState>({
+    tab: 'home',
+    overlay: null,
+  });
+  const [liveState, setLiveState] = useState<ProfileRouteViewState>(() =>
+    typeof window !== 'undefined' && !isPreview
+      ? parseProfileSearch(window.location.search)
+      : { tab: 'home', overlay: null }
+  );
 
-  // Modals state
-  const [isShareOpen, setIsShareOpen] = useState(false);
-  const [isDesignStudioOpen, setIsDesignStudioOpen] = useState(false);
-  const [isEmailCollectorOpen, setIsEmailCollectorOpen] = useState(false);
-  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [cardDetailInfo, setCardDetailInfo] = useState<CardModalInfo | null>(null);
+  useEffect(() => {
+    if (isPreview) return;
+    const syncFromUrl = () => {
+      setLiveState(parseProfileSearch(window.location.search));
+    };
+    syncFromUrl();
+    return subscribeToNavigation(syncFromUrl);
+  }, [isPreview]);
+
+  const viewState = isPreview ? previewState : liveState;
+  const activeTab = viewState.tab;
+  const activeOverlay = viewState.overlay;
+
+  // Per-tab vertical scroll tracking & restoration
+  const currentPathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+  const tabSectionKey = `profile:${currentPathname}:${activeTab}`;
+  const prevTabSectionKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (isPreview) return;
+
+    const prevKey = prevTabSectionKeyRef.current;
+    if (prevKey === null) {
+      prevTabSectionKeyRef.current = tabSectionKey;
+      const saved = getSavedSectionScroll(tabSectionKey);
+      requestAnimationFrame(() => {
+        if (!isBodyScrollLocked()) {
+          restoreScrollY(saved ?? 0);
+        }
+      });
+    } else if (prevKey !== tabSectionKey) {
+      prevTabSectionKeyRef.current = tabSectionKey;
+      const saved = getSavedSectionScroll(tabSectionKey);
+      if (saved !== undefined) {
+        requestAnimationFrame(() => {
+          if (!isBodyScrollLocked()) {
+            restoreScrollY(saved);
+          }
+        });
+      }
+    }
+
+    const onScroll = () => {
+      if (!isBodyScrollLocked()) {
+        saveSectionScroll(tabSectionKey);
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [isPreview, tabSectionKey]);
+
+  const switchTab = (nextTab: ProfileTab) => {
+    if (nextTab === activeTab) return;
+    if (isPreview) {
+      setPreviewState((prev) => ({ ...prev, tab: nextTab }));
+      return;
+    }
+    const nextUrl = buildProfileUrl(window.location.pathname, nextTab, null);
+    pushAppUrl(nextUrl, tabSectionKey);
+  };
+
+  const openOverlay = (nextOverlay: ProfileOverlayState) => {
+    if (isPreview) {
+      setPreviewState((prev) => ({ ...prev, overlay: nextOverlay }));
+      return;
+    }
+    const nextUrl = buildProfileUrl(window.location.pathname, activeTab, nextOverlay);
+    pushAppUrl(nextUrl, tabSectionKey);
+  };
+
+  const updateOverlaySubTab = (nextOverlay: ProfileOverlayState) => {
+    if (isPreview) {
+      setPreviewState((prev) => ({ ...prev, overlay: nextOverlay }));
+      return;
+    }
+    const nextUrl = buildProfileUrl(window.location.pathname, activeTab, nextOverlay);
+    replaceAppUrl(nextUrl);
+  };
+
+  const closeOverlay = () => {
+    if (isPreview) {
+      setPreviewState((prev) => ({ ...prev, overlay: null }));
+      return;
+    }
+    const fallbackUrl = buildProfileUrl(window.location.pathname, activeTab, null);
+    goBackOrReplace(fallbackUrl);
+  };
 
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -89,37 +298,154 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const facebookHref = sanitizeUrl(profileData.socials?.facebook || '');
   const linkedinHref = sanitizeUrl(profileData.socials?.linkedin || '');
 
-  const canEditPhoto = Boolean(isOwner && !isPreview && onUpdateProfile);
+  const openPrivacyFullSection = () => openOverlay({ kind: 'privacy' });
+  const openTermsFullSection = () => openOverlay({ kind: 'terms' });
+  const openAboutFullSection = () => openOverlay({ kind: 'about' });
 
-  const openPrivacyFullSection = () =>
-    setCardDetailInfo({
-      title: 'Məxfilik Siyasəti',
-      subtitle: 'QısaGet Platforması · Son yenilənmə: 2026',
-      sections: QISAGET_PRIVACY_SECTIONS,
-      actionLabel: 'Bağla',
-    });
+  const resolvedCardDetail: CardModalInfo | null = useMemo(() => {
+    if (!activeOverlay) return null;
 
-  const openTermsFullSection = () =>
-    setCardDetailInfo({
-      title: 'İstifadə Şərtləri',
-      subtitle: 'QısaGet Platforması · Son yenilənmə: 2026',
-      sections: QISAGET_TERMS_SECTIONS,
-      actionLabel: 'Bağla',
-    });
+    if (activeOverlay.kind === 'privacy') {
+      return {
+        title: 'Məxfilik Siyasəti',
+        subtitle: 'QısaGet Platforması · Son yenilənmə: 2026',
+        sections: QISAGET_PRIVACY_SECTIONS,
+        actionLabel: 'Bağla',
+      };
+    }
 
-  const openAboutFullSection = () =>
-    setCardDetailInfo({
-      title: 'Qısaget Haqqında',
-      subtitle: 'Qisaget © 2026 · Rəsmi Platforma Bələdçisi',
-      sections: QISAGET_ABOUT_SECTIONS,
-      actionLabel: 'Instagram-da İzləyin',
-      onAction: () =>
-        window.open(
-          'https://www.instagram.com/qisaget.az/?utm_source=ig_web_button_share_sheet',
-          '_blank',
-          'noopener,noreferrer'
-        ),
-    });
+    if (activeOverlay.kind === 'terms') {
+      return {
+        title: 'İstifadə Şərtləri',
+        subtitle: 'QısaGet Platforması · Son yenilənmə: 2026',
+        sections: QISAGET_TERMS_SECTIONS,
+        actionLabel: 'Bağla',
+      };
+    }
+
+    if (activeOverlay.kind === 'about') {
+      return {
+        title: 'Qısaget Haqqında',
+        subtitle: 'Qisaget © 2026 · Rəsmi Platforma Bələdçisi',
+        sections: QISAGET_ABOUT_SECTIONS,
+        actionLabel: 'Instagram-da İzləyin',
+        onAction: () =>
+          window.open(
+            'https://www.instagram.com/qisaget.az/?utm_source=ig_web_button_share_sheet',
+            '_blank',
+            'noopener,noreferrer'
+          ),
+      };
+    }
+
+    if (activeOverlay.kind === 'product') {
+      const product = displayedProducts.find((p) => p.id === activeOverlay.id);
+      if (!product) return null;
+      const whatsappUrl = buildWhatsappOrderUrl(
+        profileData.wa,
+        product.title,
+        product.colorName,
+        product.price,
+        product.currency
+      );
+      return {
+        title: product.title,
+        subtitle: `${product.colorName ? `${product.colorName} rəng • ` : ''}${product.price} ${product.currency}${product.badge ? ` (${product.badge})` : ''}`,
+        description: `${product.description} Qiymət: ${product.price} ${product.currency}${
+          product.originalPrice ? ` (Əvvəlki: ${product.originalPrice} ${product.currency})` : ''
+        }.`,
+        actionLabel: 'WhatsApp ilə Sifariş Et',
+        onAction: () => window.open(whatsappUrl, '_blank', 'noopener,noreferrer'),
+      };
+    }
+
+    if (activeOverlay.kind === 'link') {
+      const link = (profileData.links || []).find((l) => l.id === activeOverlay.id);
+      if (!link) return null;
+      const safeLinkUrl = sanitizeUrl(link.url || '');
+      return {
+        title: link.title,
+        subtitle: link.subtitle,
+        description: `${link.title} haqqında ətraflı məlumat və layihə təfərrüatları.`,
+        colorClass: safeLinkUrl ? 'bg-neutral-900 text-white' : 'bg-black text-white',
+        points: safeLinkUrl
+          ? ['Rəsmi layihə', 'Mobil və masaüstü üçün optimizasiya edilib']
+          : ['Fərdi layihə', `${profileData.displayName} tərəfindən idarə olunur`],
+        actionLabel: safeLinkUrl ? 'Layihəni Aç' : 'Bağla',
+        onAction: safeLinkUrl
+          ? () => window.open(safeLinkUrl, '_blank', 'noopener,noreferrer')
+          : undefined,
+      };
+    }
+
+    if (activeOverlay.kind === 'card') {
+      const card =
+        displayedNews.find((c) => c.id === activeOverlay.id) ||
+        NEWS_CARDS.find((c) => c.id === activeOverlay.id);
+      if (!card) return null;
+      const safeVideo = sanitizeUrl(card.videoUrl || '');
+      if (
+        card.id === 'news-1' ||
+        card.title.toLowerCase().includes('haqqında') ||
+        card.title.toLowerCase().includes('hakinda')
+      ) {
+        return {
+          title: 'Qısaget Haqqında',
+          subtitle: 'Rəsmi Platforma Bələdçisi',
+          sections: QISAGET_ABOUT_SECTIONS,
+          actionLabel: 'Instagram-da İzləyin',
+          onAction: () =>
+            window.open(
+              'https://www.instagram.com/qisaget.az/?utm_source=ig_web_button_share_sheet',
+              '_blank',
+              'noopener,noreferrer'
+            ),
+        };
+      }
+      if (safeVideo) {
+        return {
+          title: card.title,
+          subtitle: card.tag,
+          description: card.content,
+          actionLabel: 'Videonu Açın və İzləyin',
+          onAction: () => window.open(safeVideo, '_blank', 'noopener,noreferrer'),
+        };
+      }
+      return {
+        title: card.title,
+        subtitle: card.tag || 'Bələdçi',
+        description: card.content,
+        actionLabel: 'Instagram-da İzləyin',
+        onAction: () =>
+          window.open(
+            instagramHref ||
+              'https://www.instagram.com/qisaget.az/?utm_source=ig_web_button_share_sheet',
+            '_blank',
+            'noopener,noreferrer'
+          ),
+      };
+    }
+
+    if (activeOverlay.kind === 'music') {
+      const track = displayedMixtapes.find((t) => t.id === activeOverlay.id);
+      if (!track) return null;
+      return {
+        title: track.title,
+        subtitle: `İfaçı: ${track.artist} · Müddət: ${track.duration}`,
+        description:
+          'Qisaget Yaradıcı Miksteyp seriyası: işləyərkən, dizayn edərkən və məzmun yaradarkən dinləmək üçün xüsusi lofi aranjeman.',
+        gradient: track.gradient,
+        points: ['Web Audio API ilə canlı sintez', 'Offline rejimdə işləyir', 'Fokus və yaradıcılıq üçün'],
+        actionLabel: 'Pleylisti dinlə',
+      };
+    }
+
+    return null;
+  }, [activeOverlay, displayedMixtapes, displayedNews, displayedProducts, instagramHref, profileData.displayName, profileData.links, profileData.wa]);
+
+  const isShareOpen = activeOverlay?.kind === 'share';
+  const isEmailCollectorOpen = activeOverlay?.kind === 'email';
+  const isCartOpen = activeOverlay?.kind === 'cart';
 
   return (
     <div
@@ -128,11 +454,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     >
       {/* Phone container */}
       <div
-        className={`max-w-[580px] mx-auto ${isPreview ? 'min-h-full rounded-[28px]' : 'min-h-screen'} relative pb-14 shadow-2xl transition-colors duration-300`}
+        className={`max-w-[580px] mx-auto ${isPreview ? 'min-h-full rounded-[28px] overflow-hidden' : 'min-h-screen'} relative pb-14 shadow-2xl transition-colors duration-300`}
         style={{ backgroundColor: activeTheme.bg }}
       >
         {/* HERO PHOTO AREA WITH BOTTOM GRADIENT FADE */}
-        <div className="h-[390px] sm:h-[430px] w-full relative overflow-hidden rounded-t-[32px] select-none group">
+        <div className="h-[390px] sm:h-[430px] w-full relative overflow-hidden select-none group">
           {profileData.heroImageUrl ? (
             <img
               src={profileData.heroImageUrl}
@@ -145,22 +471,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             />
           ) : (
             <div
-              className="relative z-0 w-full h-full flex items-center justify-center"
+              className="relative z-0 w-full h-full"
               style={{
                 background: `linear-gradient(to bottom, ${hexToRgba(activeTheme.bg, 0.72)}, ${activeTheme.bg})`,
               }}
-            >
-              {canEditPhoto && (
-                <button
-                  type="button"
-                  onClick={() => setIsPhotoModalOpen(true)}
-                  className="relative z-20 px-4 py-2.5 bg-white hover:bg-neutral-50 text-black text-xs font-bold rounded-full border-2 border-black brutal-shadow flex items-center gap-2 transition-transform hover:scale-105 cursor-pointer"
-                >
-                  <Camera className="w-4 h-4 text-[#12365c]" />
-                  <span>Foto Yerləşdir</span>
-                </button>
-              )}
-            </div>
+            />
           )}
 
           {/* Bottom gradient fade effect layered ON TOP of the photo */}
@@ -182,21 +497,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             >
               <QLogo size={22} strokeWidth={9} />
             </button>
-          )}
-
-          {/* Top Right Action (Owner edit photo) */}
-          {canEditPhoto && (
-            <div className="absolute top-4 right-4 flex items-center gap-2 z-30">
-              <button
-                type="button"
-                onClick={() => setIsPhotoModalOpen(true)}
-                className="px-3 py-1.5 bg-white/85 hover:bg-white backdrop-blur-md rounded-full text-black text-[11px] font-bold border border-black/20 shadow-md flex items-center gap-1.5 transition-all cursor-pointer"
-                title="Fotonu dəyiş"
-              >
-                <Camera className="w-3.5 h-3.5" />
-                <span>Fotonu Dəyiş</span>
-              </button>
-            </div>
           )}
         </div>
 
@@ -332,7 +632,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         >
           <button
             type="button"
-            onClick={() => setActiveTab('home')}
+            onClick={() => switchTab('home')}
             className={`flex-1 rounded-[26px] font-bold text-[15px] transition-all cursor-pointer ${
               activeTab === 'home'
                 ? 'bg-white text-black brutal-shadow-sm'
@@ -343,7 +643,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('shop')}
+            onClick={() => switchTab('shop')}
             className={`flex-1 rounded-[26px] font-bold text-[15px] transition-all cursor-pointer flex items-center justify-center ${
               activeTab === 'shop'
                 ? 'bg-white text-black brutal-shadow-sm'
@@ -373,14 +673,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         if (safeLinkUrl) {
                           window.open(safeLinkUrl, '_blank', 'noopener,noreferrer');
                         } else {
-                          setCardDetailInfo({
-                            title: link.title,
-                            subtitle: link.subtitle,
-                            description: `${link.title} - ${link.subtitle || ''}`,
-                            colorClass: 'bg-black text-white',
-                            points: ['Fərdi layihə', `${profileData.displayName} tərəfindən idarə olunur`],
-                            actionLabel: 'Bağla',
-                          });
+                          openOverlay({ kind: 'link', id: link.id });
                         }
                       }}
                       className="bg-white border-2 border-black rounded-full brutal-shadow-xs sm:brutal-shadow px-3.5 sm:px-5 py-2 sm:py-3 flex items-center justify-between text-black min-h-[54px] sm:min-h-[62px] hover:-translate-y-0.5 sm:hover:-translate-y-1 active:translate-y-0 transition-transform cursor-pointer group"
@@ -423,17 +716,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setCardDetailInfo({
-                            title: link.title,
-                            subtitle: link.subtitle,
-                            description: `${link.title} haqqında ətraflı məlumat və layihə təfərrüatları.`,
-                            colorClass: 'bg-neutral-900 text-white',
-                            points: ['Rəsmi layihə', 'Mobil və masaüstü üçün optimizasiya edilib'],
-                            actionLabel: safeLinkUrl ? 'Layihəni Aç' : 'Bağla',
-                            onAction: safeLinkUrl
-                              ? () => window.open(safeLinkUrl, '_blank', 'noopener,noreferrer')
-                              : undefined,
-                          });
+                          openOverlay({ kind: 'link', id: link.id });
                         }}
                         className="text-neutral-400 group-hover:text-black font-bold text-sm sm:text-base px-1 py-1 cursor-pointer"
                         aria-label="Seçimlər"
@@ -454,48 +737,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   return (
                     <div
                       key={card.id}
-                      onClick={() => {
-                        if (
-                          card.id === 'news-1' ||
-                          card.title.toLowerCase().includes('haqqında') ||
-                          card.title.toLowerCase().includes('hakinda')
-                        ) {
-                          setCardDetailInfo({
-                            title: 'Qısaget Haqqında',
-                            subtitle: 'Rəsmi Platforma Bələdçisi',
-                            sections: QISAGET_ABOUT_SECTIONS,
-                            actionLabel: 'Instagram-da İzləyin',
-                            onAction: () =>
-                              window.open(
-                                'https://www.instagram.com/qisaget.az/?utm_source=ig_web_button_share_sheet',
-                                '_blank',
-                                'noopener,noreferrer'
-                              ),
-                          });
-                        } else if (safeVideo) {
-                          setCardDetailInfo({
-                            title: card.title,
-                            subtitle: card.tag,
-                            description: card.content,
-                            actionLabel: 'Videonu Açın və İzləyin',
-                            onAction: () => window.open(safeVideo, '_blank', 'noopener,noreferrer'),
-                          });
-                        } else {
-                          setCardDetailInfo({
-                            title: card.title,
-                            subtitle: card.tag || 'Bələdçi',
-                            description: card.content,
-                            actionLabel: 'Instagram-da İzləyin',
-                            onAction: () =>
-                              window.open(
-                                instagramHref ||
-                                  'https://www.instagram.com/qisaget.az/?utm_source=ig_web_button_share_sheet',
-                                '_blank',
-                                'noopener,noreferrer'
-                              ),
-                          });
-                        }
-                      }}
+                      onClick={() => openOverlay({ kind: 'card', id: card.id })}
                       className="flex-none basis-[210px] sm:basis-[370px] bg-white border-2 border-black rounded-[18px] sm:rounded-[24px] p-2.5 sm:p-3.5 pb-0 brutal-shadow-xs sm:brutal-shadow overflow-hidden snap-start cursor-pointer transition-transform hover:-translate-y-0.5 sm:hover:-translate-y-1 active:translate-y-0 group"
                     >
                       <div
@@ -552,17 +794,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 </h2>
                 <MixtapePlayer
                   tracks={displayedMixtapes}
-                  onOpenInfo={(track) =>
-                    setCardDetailInfo({
-                      title: track.title,
-                      subtitle: `İfaçı: ${track.artist} · Müddət: ${track.duration}`,
-                      description:
-                        'Qisaget Yaradıcı Miksteyp seriyası: işləyərkən, dizayn edərkən və məzmun yaradarkən dinləmək üçün xüsusi lofi aranjeman.',
-                      gradient: track.gradient,
-                      points: ['Web Audio API ilə canlı sintez', 'Offline rejimdə işləyir', 'Fokus və yaradıcılıq üçün'],
-                      actionLabel: 'Pleylisti dinlə',
-                    })
-                  }
+                  onOpenInfo={(track) => openOverlay({ kind: 'music', id: track.id })}
                 />
               </section>
             )}
@@ -641,6 +873,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 Qisaget © 2026
               </button>
             </div>
+            {!isPreview && (
+              <div className="!mt-2.5 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => onNavigate?.('/admin')}
+                  className={`text-[12px] font-medium opacity-75 hover:opacity-100 hover:underline transition-opacity cursor-pointer px-3 py-1 ${mutedTextClass}`}
+                >
+                  na.mexman
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           /* TAB CONTENT: SHOP / MAĞAZA */
@@ -668,17 +911,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     >
                       {/* Product Image Container */}
                       <div
-                        onClick={() => {
-                          setCardDetailInfo({
-                            title: product.title,
-                            subtitle: `${product.colorName ? `${product.colorName} rəng • ` : ''}${product.price} ${product.currency}${product.badge ? ` (${product.badge})` : ''}`,
-                            description: `${product.description} Qiymət: ${product.price} ${product.currency}${
-                              product.originalPrice ? ` (Əvvəlki: ${product.originalPrice} ${product.currency})` : ''
-                            }.`,
-                            actionLabel: 'WhatsApp ilə Sifariş Et',
-                            onAction: () => window.open(whatsappUrl, '_blank', 'noopener,noreferrer'),
-                          });
-                        }}
+                        onClick={() => openOverlay({ kind: 'product', id: product.id })}
                         className="relative bg-white cursor-pointer overflow-hidden p-2 flex items-center justify-center border-b border-neutral-100"
                       >
                         {product.imageUrl ? (
@@ -753,6 +986,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 Qisaget © 2026
               </button>
             </div>
+            {!isPreview && (
+              <div className="!mt-1.5 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => onNavigate?.('/admin')}
+                  className={`text-[12px] font-medium opacity-75 hover:opacity-100 hover:underline transition-opacity cursor-pointer px-3 py-1 ${mutedTextClass}`}
+                >
+                  na.mexman
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -762,57 +1006,31 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <>
           <ShareModal
             isOpen={isShareOpen}
-            onClose={() => setIsShareOpen(false)}
+            onClose={closeOverlay}
             url={`https://qisaget.az/${profileData.username}`}
             title={`${profileData.displayName} - Qisaget Bio`}
+            activeTab={activeOverlay?.kind === 'share' ? activeOverlay.subTab : 'share'}
+            onTabChange={(subTab) => updateOverlaySubTab({ kind: 'share', subTab })}
           />
-
-          {onUpdateProfile && (
-            <DesignStudioModal
-              isOpen={isDesignStudioOpen}
-              onClose={() => setIsDesignStudioOpen(false)}
-              profileData={profileData}
-              onUpdateProfile={onUpdateProfile}
-            />
-          )}
 
           <EmailCollectorModal
             isOpen={isEmailCollectorOpen}
-            onClose={() => setIsEmailCollectorOpen(false)}
+            onClose={closeOverlay}
           />
 
           <CardDetailModal
-            info={cardDetailInfo}
-            onClose={() => setCardDetailInfo(null)}
+            info={resolvedCardDetail}
+            onClose={closeOverlay}
           />
 
           <CartModal
             isOpen={isCartOpen}
-            onClose={() => setIsCartOpen(false)}
+            onClose={closeOverlay}
             cart={cart}
             onUpdateQuantity={handleUpdateQuantity}
             onRemoveItem={handleRemoveFromCart}
             onClearCart={() => setCart([])}
           />
-
-          {onUpdateProfile && (
-            <PhotoUploaderModal
-              isOpen={isPhotoModalOpen}
-              onClose={() => setIsPhotoModalOpen(false)}
-              currentImageUrl={profileData.heroImageUrl}
-              currentOffsetY={profileData.heroImageOffsetY ?? 20}
-              currentScale={profileData.heroImageScale ?? 1.08}
-              displayName={profileData.displayName}
-              onSavePhotoSettings={({ imageUrl, offsetY, scale }) => {
-                onUpdateProfile({
-                  ...profileData,
-                  heroImageUrl: imageUrl,
-                  heroImageOffsetY: offsetY,
-                  heroImageScale: scale,
-                });
-              }}
-            />
-          )}
         </>
       )}
     </div>

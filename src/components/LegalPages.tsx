@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowLeft, FileText, ShieldCheck } from 'lucide-react';
 import { QLogo } from './QLogo';
+import { goBackOrReplace } from '../lib/navigation';
 
 interface LegalPageProps {
   mode: 'privacy' | 'terms';
@@ -16,7 +17,7 @@ export const LegalPages: React.FC<LegalPageProps> = ({ mode, onNavigate }) => {
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
-            onClick={() => onNavigate('/')}
+            onClick={() => goBackOrReplace('/')}
             className="min-h-[44px] px-4 py-2 bg-white border-2 border-black rounded-full brutal-shadow-sm font-bold text-xs sm:text-sm flex items-center gap-2 hover:-translate-y-0.5 transition-transform cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />

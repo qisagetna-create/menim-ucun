@@ -3,24 +3,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import {
   createNaMexmanTemplateProfile,
-  saveProfileChanges,
   subscribeToProfile,
 } from './lib/firestoreProfiles';
 import { getFirebaseErrorMessageAz } from './lib/firebase';
 import { updateMetaTags, updateProfileMetaTags, validateUsername } from './lib/sanitize';
+import {
+  getSavedSectionScroll,
+  initNavigation,
+  pushAppUrl,
+  restoreScrollY,
+  saveSectionScroll,
+  subscribeToNavigation,
+} from './lib/navigation';
+import { isBodyScrollLocked } from './lib/useBodyScrollLock';
 import { ProfileData } from './types';
 import { ProfileView } from './components/ProfileView';
 import { LandingView } from './components/LandingView';
 import { LegalPages } from './components/LegalPages';
 import { NotFoundView } from './components/NotFoundView';
+import { AdminPanel } from './components/AdminPanel';
 
 type RouteState =
   | { kind: 'root' }
+  | { kind: 'admin' }
   | { kind: 'privacy' }
   | { kind: 'terms' }
   | { kind: 'landing' }
@@ -29,9 +39,8 @@ type RouteState =
 
 function parseRoute(pathname: string): RouteState {
   const clean = pathname.replace(/\/+$/, '').toLowerCase() || '/';
-  if (clean === '/' || clean === '/admin' || clean === '/login' || clean === '/giris') {
-    return { kind: 'root' };
-  }
+  if (clean === '/') return { kind: 'root' };
+  if (clean === '/admin' || clean === '/login' || clean === '/giris') return { kind: 'admin' };
   if (clean === '/mexfilik' || clean === '/privacy') return { kind: 'privacy' };
   if (clean === '/sertler' || clean === '/terms') return { kind: 'terms' };
   if (clean === '/ana-sehife' || clean === '/explore') return { kind: 'landing' };
@@ -45,9 +54,18 @@ function parseRoute(pathname: string): RouteState {
   return { kind: 'profile', username: check.normalized };
 }
 
+function getRouteKey(r: RouteState): string {
+  if (r.kind === 'profile') return `profile:${r.username}`;
+  if (r.kind === 'notfound') return `notfound:${r.slug || ''}`;
+  return r.kind;
+}
+
 export default function App() {
-  const { user, isOffline } = useAuth();
-  const [route, setRoute] = useState<RouteState>(() => parseRoute(window.location.pathname));
+  const { isOffline } = useAuth();
+  const [route, setRoute] = useState<RouteState>(() => {
+    initNavigation();
+    return parseRoute(window.location.pathname);
+  });
 
   const [profileState, setProfileState] = useState<{
     status: 'idle' | 'loading' | 'loaded' | 'notfound' | 'error';
@@ -55,28 +73,64 @@ export default function App() {
     errorMessage?: string;
   }>({ status: 'idle', data: null });
 
+  // AdminPanel manages its own per-section scroll memory internally
+  const pageScrollKey =
+    route.kind !== 'root' && route.kind !== 'profile' && route.kind !== 'admin'
+      ? `page:${getRouteKey(route)}`
+      : null;
+  const prevPageScrollKeyRef = useRef<string | null>(pageScrollKey);
+
   const navigate = (path: string) => {
     const target = path.startsWith('/') ? path : `/${path}`;
-    if (window.location.pathname !== target) {
-      window.history.pushState({}, '', target);
-    }
-    setRoute(parseRoute(target));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    pushAppUrl(target, pageScrollKey ?? undefined);
   };
 
   useEffect(() => {
-    const onPopState = () => {
-      setRoute(parseRoute(window.location.pathname));
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
+    initNavigation();
+    const unsubNav = subscribeToNavigation(() => {
+      const next = parseRoute(window.location.pathname);
+      setRoute((prev) => (getRouteKey(prev) === getRouteKey(next) ? prev : next));
+    });
+    return () => unsubNav();
   }, []);
 
-  // Subscribe to Firestore in real time when viewing / (loads na.mexman if present, else Landing) or /{username}
+  // Track and restore scroll position for standalone pages (privacy, terms, landing, notfound)
+  useEffect(() => {
+    if (!pageScrollKey) {
+      prevPageScrollKeyRef.current = null;
+      return;
+    }
+
+    if (prevPageScrollKeyRef.current !== pageScrollKey) {
+      prevPageScrollKeyRef.current = pageScrollKey;
+      const saved = getSavedSectionScroll(pageScrollKey);
+      requestAnimationFrame(() => {
+        if (!isBodyScrollLocked()) {
+          restoreScrollY(saved ?? 0);
+        }
+      });
+    }
+
+    const onScroll = () => {
+      if (!isBodyScrollLocked()) {
+        saveSectionScroll(pageScrollKey);
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [pageScrollKey]);
+
+  // Subscribe to Firestore in real time when viewing / (loads na.mexman if present) or /{username}
   useEffect(() => {
     if (route.kind !== 'root' && route.kind !== 'profile') {
       setProfileState({ status: 'idle', data: null });
-      if (route.kind === 'privacy') {
+      if (route.kind === 'admin') {
+        updateMetaTags({
+          title: 'İdarə Paneli | QısaGet',
+          description: 'QısaGet profil, linklər və mağaza idarəetmə paneli.',
+        });
+      } else if (route.kind === 'privacy') {
         updateMetaTags({
           title: 'Məxfilik Siyasəti | QısaGet',
           description: 'QısaGet platformasının məxfilik və məlumat təhlükəsizliyi siyasəti.',
@@ -123,15 +177,9 @@ export default function App() {
     return () => unsub();
   }, [route]);
 
-  const handleQuickOwnerUpdate = async (updated: ProfileData) => {
-    if (!updated.username || !user) return;
-    setProfileState((prev) => ({ ...prev, data: updated }));
-    try {
-      await saveProfileChanges(updated.username, updated.ownerUid || user.uid, updated);
-    } catch (err) {
-      console.error('Profil yenilənə bilmədi:', getFirebaseErrorMessageAz(err));
-    }
-  };
+  if (route.kind === 'admin') {
+    return <AdminPanel onNavigate={navigate} />;
+  }
 
   if (route.kind === 'privacy') {
     return <LegalPages mode="privacy" onNavigate={navigate} />;
@@ -192,7 +240,6 @@ export default function App() {
         <div className="w-full min-h-screen">
           <ProfileView
             profileData={initialViewProfile}
-            isOwner={false}
             onNavigate={navigate}
           />
         </div>
@@ -202,7 +249,6 @@ export default function App() {
   }
 
   const profileData = profileState.data!;
-  const isOwner = Boolean(user && profileData.ownerUid && user.uid === profileData.ownerUid);
 
   return (
     <div className="w-full min-h-screen">
@@ -213,8 +259,6 @@ export default function App() {
       )}
       <ProfileView
         profileData={profileData}
-        isOwner={isOwner}
-        onUpdateProfile={isOwner ? handleQuickOwnerUpdate : undefined}
         onNavigate={navigate}
       />
     </div>

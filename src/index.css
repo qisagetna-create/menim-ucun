@@ -18,6 +18,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Prevent scroll chaining & rubber-band bleed from modal content to background */
+.modal-scrollable-content {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
 /* Neo-brutalist shadow utility */
 .brutal-shadow {
   box-shadow: 4px 5px 0 #000000;

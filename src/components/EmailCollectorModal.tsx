@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Mail, CheckCircle2, ArrowRight } from 'lucide-react';
+import { useBodyScrollLock } from '../lib/useBodyScrollLock';
 
 interface EmailCollectorModalProps {
   isOpen: boolean;
@@ -14,6 +15,20 @@ export const EmailCollectorModal: React.FC<EmailCollectorModalProps> = ({
   const [name, setName] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+
+  useBodyScrollLock(isOpen);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -36,16 +51,19 @@ export const EmailCollectorModal: React.FC<EmailCollectorModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overscroll-none animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm bg-white border-2 border-black rounded-[28px] brutal-shadow p-6 relative"
+        data-scroll-container="true"
+        className="w-full max-w-sm bg-white border-2 border-black rounded-[28px] brutal-shadow p-6 relative max-h-[90vh] overflow-y-auto overscroll-contain modal-scrollable-content"
+        style={{ overscrollBehavior: 'contain' }}
         onClick={(e) => e.stopPropagation()}
       >
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center border border-black/20 transition-colors"
+          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center border border-black/20 transition-colors cursor-pointer"
           aria-label="Bağla"
         >
           <X className="w-5 h-5 text-black" />

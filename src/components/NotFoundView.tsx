@@ -1,13 +1,14 @@
 import React from 'react';
 import { ArrowLeft, SearchX } from 'lucide-react';
 import { QLogo } from './QLogo';
+import { goBackOrReplace } from '../lib/navigation';
 
 interface NotFoundViewProps {
   requestedSlug?: string;
   onNavigate: (path: string) => void;
 }
 
-export const NotFoundView: React.FC<NotFoundViewProps> = ({ requestedSlug, onNavigate }) => {
+export const NotFoundView: React.FC<NotFoundViewProps> = ({ requestedSlug }) => {
   return (
     <div className="min-h-screen bg-[#6ea6d8] flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white border-2 border-black rounded-[32px] brutal-shadow p-7 sm:p-8 text-center space-y-5">
@@ -36,7 +37,7 @@ export const NotFoundView: React.FC<NotFoundViewProps> = ({ requestedSlug, onNav
         <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
           <button
             type="button"
-            onClick={() => onNavigate('/')}
+            onClick={() => goBackOrReplace('/')}
             className="flex-1 min-h-[44px] px-4 py-2.5 bg-black text-white rounded-xl text-xs font-bold hover:bg-neutral-800 brutal-shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />

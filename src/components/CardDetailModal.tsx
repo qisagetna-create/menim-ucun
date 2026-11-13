@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { X, ArrowRight } from 'lucide-react';
 import { QLogo } from './QLogo';
+import { useBodyScrollLock } from '../lib/useBodyScrollLock';
 
 export interface CardModalSection {
   title: string;
@@ -26,39 +27,39 @@ interface CardDetailModalProps {
 
 export const CardDetailModal: React.FC<CardDetailModalProps> = ({ info, onClose }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isOpen = Boolean(info);
+
+  useBodyScrollLock(isOpen);
 
   useEffect(() => {
     if (!info) return;
-
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverflow = document.documentElement.style.overflow;
-
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-
     if (scrollRef.current) {
       scrollRef.current.scrollTop = 0;
     }
 
-    return () => {
-      document.body.style.overflow = prevBodyOverflow;
-      document.documentElement.style.overflow = prevHtmlOverflow;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
     };
-  }, [info]);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [info, onClose]);
 
   if (!info) return null;
 
   const isFullSection = Boolean(info.sections && info.sections.length > 0);
 
   if (isFullSection) {
-    // Tam bölmə kimi açılan Haqqında görünüşü
+    // Tam bölmə kimi açılan Haqqında / Məxfilik / Şərtlər görünüşü
     return (
       <div
-        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-center items-center overscroll-contain touch-none animate-in fade-in duration-200"
+        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-center items-center overscroll-none animate-in fade-in duration-200"
         onClick={onClose}
       >
         <div
-          className="w-full max-w-[580px] h-full sm:h-[94vh] bg-white sm:border-2 sm:border-black sm:rounded-[32px] sm:brutal-shadow flex flex-col overflow-hidden relative touch-auto"
+          className="w-full max-w-[580px] h-full sm:h-[94vh] bg-white sm:border-2 sm:border-black sm:rounded-[32px] sm:brutal-shadow flex flex-col overflow-hidden relative"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header banner - Göy rəngdə (#12365c), mərkəzində Qısaget loqosu */}
@@ -70,6 +71,7 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({ info, onClose 
 
             {/* Close button */}
             <button
+              type="button"
               onClick={onClose}
               className="absolute top-3.5 right-4 w-9 h-9 rounded-full bg-white/20 hover:bg-white/35 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer border border-white/25 shadow-xs"
               aria-label="Bağla"
@@ -81,6 +83,7 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({ info, onClose 
           {/* Sürüşdürülə bilən əsas mətn sahəsi (arxadakı səhifə sürüşmür) */}
           <div
             ref={scrollRef}
+            data-scroll-container="true"
             className="flex-1 overflow-y-auto overscroll-contain px-5 sm:px-7 py-5 space-y-4 modal-scrollable-content"
             style={{ overscrollBehavior: 'contain' }}
           >
@@ -142,11 +145,11 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({ info, onClose 
   // Standart yığcam modal
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overscroll-contain touch-none animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overscroll-none animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md bg-white border-2 border-black rounded-[28px] brutal-shadow overflow-hidden relative flex flex-col max-h-[90vh] touch-auto"
+        className="w-full max-w-md bg-white border-2 border-black rounded-[28px] brutal-shadow overflow-hidden relative flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header banner */}
@@ -157,6 +160,7 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({ info, onClose 
           </div>
 
           <button
+            type="button"
             onClick={onClose}
             className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center transition-colors cursor-pointer border border-white/20"
             aria-label="Bağla"
@@ -168,6 +172,7 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({ info, onClose 
         {/* Content body */}
         <div
           ref={scrollRef}
+          data-scroll-container="true"
           className="p-5 sm:p-6 space-y-4 overflow-y-auto overscroll-contain modal-scrollable-content"
           style={{ overscrollBehavior: 'contain' }}
         >

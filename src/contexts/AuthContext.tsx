@@ -16,6 +16,8 @@ import {
   getFirebaseErrorMessageAz,
 } from '../lib/firebase';
 
+import { replaceAppUrl } from '../lib/navigation';
+
 const EMAIL_STORAGE_KEY = 'qisaget_email_for_signin';
 
 interface AuthContextValue {
@@ -59,7 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signInWithEmailLink(auth, savedEmail, window.location.href)
           .then(() => {
             window.localStorage.removeItem(EMAIL_STORAGE_KEY);
-            window.history.replaceState({}, document.title, '/admin');
+            replaceAppUrl('/admin');
           })
           .catch((err) => {
             setAuthError(getFirebaseErrorMessageAz(err));
@@ -125,7 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await signInWithEmailLink(auth, trimmed, window.location.href);
       window.localStorage.removeItem(EMAIL_STORAGE_KEY);
       setNeedsEmailConfirmationForLink(false);
-      window.history.replaceState({}, document.title, '/admin');
+      replaceAppUrl('/admin');
       return res.user;
     } catch (err) {
       const msg = getFirebaseErrorMessageAz(err);

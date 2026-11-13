@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, Palette, Check, Plus, Trash2, Sparkles, RefreshCw } from 'lucide-react';
 import { ProfileData, CustomLink } from '../types';
 import { THEME_OPTIONS, INITIAL_PROFILE } from '../data/defaults';
+import { useBodyScrollLock } from '../lib/useBodyScrollLock';
 
 interface DesignStudioModalProps {
   isOpen: boolean;
   onClose: () => void;
   profileData: ProfileData;
   onUpdateProfile: (data: ProfileData) => void;
+  activeTab?: 'theme' | 'bio' | 'links';
+  onTabChange?: (tab: 'theme' | 'bio' | 'links') => void;
 }
 
 export const DesignStudioModal: React.FC<DesignStudioModalProps> = ({
@@ -15,8 +18,44 @@ export const DesignStudioModal: React.FC<DesignStudioModalProps> = ({
   onClose,
   profileData,
   onUpdateProfile,
+  activeTab: controlledTab,
+  onTabChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<'theme' | 'bio' | 'links'>('theme');
+  const [internalTab, setInternalTab] = useState<'theme' | 'bio' | 'links'>('theme');
+  const activeTab = controlledTab ?? internalTab;
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const tabScrollMapRef = useRef<Record<string, number>>({});
+
+  const setActiveTab = (next: 'theme' | 'bio' | 'links') => {
+    if (scrollContainerRef.current) {
+      tabScrollMapRef.current[activeTab] = scrollContainerRef.current.scrollTop;
+    }
+    if (onTabChange) {
+      onTabChange(next);
+    } else {
+      setInternalTab(next);
+    }
+  };
+
+  useBodyScrollLock(isOpen);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen || !scrollContainerRef.current) return;
+    scrollContainerRef.current.scrollTop = tabScrollMapRef.current[activeTab] ?? 0;
+  }, [activeTab, isOpen]);
+
   const [currentThemeId, setCurrentThemeId] = useState(profileData.themeId);
   const [displayName, setDisplayName] = useState(profileData.displayName);
   const [bio, setBio] = useState(profileData.bio);
@@ -74,16 +113,17 @@ export const DesignStudioModal: React.FC<DesignStudioModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overscroll-none animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-white border-2 border-black rounded-[28px] brutal-shadow p-6 max-h-[90vh] flex flex-col relative"
+        className="w-full max-w-lg bg-white border-2 border-black rounded-[28px] brutal-shadow p-6 max-h-[90vh] flex flex-col relative overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center border border-black/20 transition-colors"
+          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center border border-black/20 transition-colors cursor-pointer"
           aria-label="Bağla"
         >
           <X className="w-5 h-5 text-black" />
@@ -128,7 +168,15 @@ export const DesignStudioModal: React.FC<DesignStudioModalProps> = ({
         </div>
 
         {/* Tab Contents */}
-        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+        <div
+          ref={scrollContainerRef}
+          data-scroll-container="true"
+          onScroll={(e) => {
+            tabScrollMapRef.current[activeTab] = e.currentTarget.scrollTop;
+          }}
+          className="flex-1 overflow-y-auto overscroll-contain space-y-4 pr-1 modal-scrollable-content"
+          style={{ overscrollBehavior: 'contain' }}
+        >
           {activeTab === 'theme' && (
             <div className="space-y-3">
               <p className="text-xs font-bold text-neutral-700">Bir stil və rəng palitrası seçin:</p>
